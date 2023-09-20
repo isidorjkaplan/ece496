@@ -26,6 +26,9 @@
 # *.vhd
 # *.v
 
+*.c5_pin_model_dump.txt
+*.hps_isw_handoff/
+*.hps_sdram_p0_summary.csv
 # ignore Quartus II generated files
 *_generation_script*
 *_inst.vhd
