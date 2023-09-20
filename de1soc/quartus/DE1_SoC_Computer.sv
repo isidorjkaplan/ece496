@@ -402,194 +402,75 @@ reg initEnable = 0;
 
 reg [31:0] hps_to_fpga_readdata ; 
 reg hps_to_fpga_read ; // read command
-// status addresses
-// base => fill level
-// base+1 => status bits; 
-//           bit0==1 if full
-//           bit1==1 if empty
-wire [31:0] hps_to_fpga_out_csr_address = 32'd1 ; // fill_level  // should probably init to 0
 reg[31:0] hps_to_fpga_out_csr_readdata ;
-reg hps_to_fpga_out_csr_read ; // status regs read cmd
+
 reg [7:0] HPS_to_FPGA_state ;
-reg [31:0] data_buffer ;
-reg data_buffer_valid ;
+reg hps_to_fpga_readdata_valid;
 
 //=======================================================
 // Controls for FPGA_to_HPS FIFO
 //=======================================================
 
 reg [31:0] fpga_to_hps_in_writedata ; 
-reg fpga_to_hps_in_write ; // write command
-// status addresses
-// base => fill level
-// base+1 => status bits; 
-//           bit0==1 if full
-//           bit1==1 if empty
-wire [31:0] fpga_to_hps_in_csr_address = 32'd1 ; // fill_level  // should probably init to 0
+reg fpga_to_hps_stalled; 
+reg fpga_to_hps_in_writedata_valid ;
+reg fpga_to_hps_in_write ; // write command to HPS
 reg[31:0] fpga_to_hps_in_csr_readdata ;
-reg fpga_to_hps_in_csr_read ; // status regs read cmd
+
 reg [7:0] FPGA_to_HPS_state ;
-reg [7:0] Processing_state ;
   
-typedef struct {
-	reg [31:0] test_cmd;                  // command number
-	reg [31:0] test_dat1;               // hi bits of data1
-	reg [31:0] test_dat2;               // lo bits of data1
-	reg [31:0] test_dat3;               // hi bits of data2
-} testCommand;
+//=======================================================
+// Controls for our module we are inserting
+//=======================================================
 
-testCommand commandIn;   // from HPS
-testCommand commandOut;  // to HPS
-reg [7:0]  commandCount = 8'b0;
+reg stall_reads = 0; //if this signal is high then we cannot handle more data so pause reading
+de1soc_top de1soc(CLOCK_50, hps_to_fpga_readdata, hps_to_fpga_readdata_valid, fpga_to_hps_in_writedata, fpga_to_hps_in_writedata_valid, fpga_to_hps_stalled, stall_reads);
 
-
+assign fpga_to_hps_stalled = (FPGA_to_HPS_state != 1); 
 //=======================================================
 // do the work outlined above
 always @(posedge CLOCK_50) begin 
-
-   // reset state machine and read/write controls
+	// reset state machine and read/write controls
 	if(initEnable == 0) begin
 		sram_write <= 1'b0 ;
-		commandCount <= 0 ;
-		data_buffer_valid <= 1'b0;
-		HPS_to_FPGA_state <= 8'd3 ;
+		HPS_to_FPGA_state <= 8'd3 ; //TODO initilize to the read state
 		FPGA_to_HPS_state <= 8'd0 ; 
-		Processing_state <= 8'd0 ; 
+		hps_to_fpga_readdata_valid <= 1'b0;
 		initEnable = 1;
-	end  // if(init_enable == 0)
+	end
 
 	// =================================
 	// HPS_to_FPGA state machine
 	//==================================
 	// Is there data in HPS_to_FPGA FIFO
 	// and the last transfer is complete
-	// data_buffer_valid is only used by the FPGA to HPS FIFO !!
-	if (HPS_to_FPGA_state == 8'd0 && !(hps_to_fpga_out_csr_readdata[1]) && !data_buffer_valid)  begin
+	if (HPS_to_FPGA_state == 8'd0 && !(hps_to_fpga_out_csr_readdata[1]) && !stall_reads)  begin
 		hps_to_fpga_read <= 1'b1 ;
-		HPS_to_FPGA_state <= 8'd2 ; //
+		HPS_to_FPGA_state <= 8'd1 ;
 	end
-	
+
 	// delay before we read
-	if (HPS_to_FPGA_state == 8'd2) begin
+	if (HPS_to_FPGA_state == 8'd1) begin
 		// zero the read request BEFORE the data appears 
 		// in the next state!
 		hps_to_fpga_read <= 1'b0 ;
-		HPS_to_FPGA_state <= 8'd4 ;
+		HPS_to_FPGA_state <= 8'd2 ;
 	end
-	
-	
+
+	// read the word from the FIFO
+	if ((HPS_to_FPGA_state == 8'd2)) begin
+		//TODO READ THE DATA 
+		hps_to_fpga_readdata_valid <= 1'b1;
+		HPS_to_FPGA_state <= 8'd3 ;  // wait and then go back to start of FSM
+	end
+
 	// delay  FOR THE TRIP BACK FROM STATE 4 TO STATE 0
 	// this test checks to see if we need more fifo read time
 	if (HPS_to_FPGA_state == 8'd3) begin
-			HPS_to_FPGA_state <= 8'd0 ;
-	end
-	
-	// read the word from the FIFO
-	if ((HPS_to_FPGA_state == 8'd4) && (hps_to_fpga_read == 1'b0)) begin
-		case(commandCount)
-		0:
-		begin
-			commandIn.test_cmd <= hps_to_fpga_readdata ; // store the data
-			commandCount <= 8'd1;
-			hps_to_fpga_read <= 1'b0 ;
-			HPS_to_FPGA_state <= 8'd3 ; 
-		end	
-		1:
-		begin
-			commandIn.test_dat1 <= hps_to_fpga_readdata ; // store the data
-			commandCount <= 8'd2;
-			hps_to_fpga_read <= 1'b0 ;
-			HPS_to_FPGA_state <= 8'd3 ; 
-		end	
-		2:
-		begin
-			commandIn.test_dat2 <= hps_to_fpga_readdata ; // store the data
-			commandCount <= 8'd3;
-			hps_to_fpga_read <= 1'b0 ;
-			HPS_to_FPGA_state <= 8'd3 ; 
-		end	
-		3:
-		begin
-			commandIn.test_dat3 <= hps_to_fpga_readdata ; // store the data
-			commandCount <= 8'd0;
-			hps_to_fpga_read <= 1'b0 ;
-			HPS_to_FPGA_state <= 8'd3 ; 
-			Processing_state <= 8'd5 ; 
-		end	
-		endcase
-	end
-	
-//----------------------------------------------
-// Processing State Machine below
-// This is where commands are performed before the results
-// are returned by the FPGA_toHPS state machine
-	// process the command from the FIFO
-	if (Processing_state == 8'd0) begin
-	 // this is the 'Home' state, where processing is inactive
-	 //  we dont really need an inactive state but if there were
-	 //  some background tasks to be done, this is where we would do them
+		HPS_to_FPGA_state <= 8'd0 ;
+		hps_to_fpga_readdata_valid <= 1'b0;
 	end
 
-//----------------------------
-//  state 5
-//----------------------------
-	// process the command from the FIFO
-	if (Processing_state == 8'd5) begin
-		commandOut <= commandIn; //echo back whatever they wrote to us
-		commandCount <= 0;
-		Processing_state <= 8'd6 ; //return a data packet
-		//TODO; handle logic processing command
-		
-	end
-
-//-------------------------------------------
-//  state 6
-//----------------------------------------	
-	if ((Processing_state == 8'd6) && (FPGA_to_HPS_state == 0)) begin
-		case(commandCount)
-		8'd0:
-		begin
-			commandCount <= 8'd1;
-			data_buffer_valid <= 1'b1 ; // set the data ready flag - do this to signal HPS that return data is ready
-			Processing_state <= 8'd7 ;  // wait for the outgoing FIFO to swallow that data 
-		end	
-		8'd1:
-		begin
-			commandCount <= 8'd2;
-			data_buffer_valid <= 1'b1 ; // set the data ready flag - do this to signal HPS that return data is ready
-			Processing_state <= 8'd7 ;  // wait for the outgoing FIFO to swallow that data 
-		end	
-		8'd2:
-		begin
-			commandCount <= 8'd3;
-			data_buffer_valid <= 1'b1 ; // set the data ready flag - do this to signal HPS that return data is ready
-			Processing_state <= 8'd7 ;  // wait for the outgoing FIFO to swallow that data 
-		end	
-		8'd3:
-		begin
-			commandCount <= 8'd4;
-			data_buffer_valid <= 1'b1 ; // set the data ready flag - do this to signal HPS that return data is ready
-			Processing_state <= 8'd7 ;  // wait for the outgoing FIFO to swallow that data 
-		end	
-		8'd4:
-		begin
-			commandCount <= 8'd0;
-			Processing_state <= 8'd0 ;  // wait for the outgoing FIFO to swallow that data 
-		end	
-		
-		endcase
-	end
-	
-	
-	// this is just a wait state to let the FPGA to HPS FIFO move the data
-	// data_buffer_valid is only used by the FPGA to HPS FIFO !!  
-	//   !data_buffer_valid means the FPGA to HPS FIFO is ready for more data
-//	if ((HPS_to_FPGA_state == 8'd7) && !data_buffer_valid)  begin
-	if ((Processing_state == 8'd7) && !data_buffer_valid)  begin
-			Processing_state <= 8'd6 ;  // data is gone, ready for more data 
-//		HPS_to_FPGA_state <= 8'd6 ; 
-//hex3_hex0[3:0] <= 4'd6;
-	end
 
 	// =================================
 	// FPGA_to_HPS state machine
@@ -597,61 +478,23 @@ always @(posedge CLOCK_50) begin
 	// is there space in the 
 	// FPGA_to_HPS FIFO
 	// and data is available
-	if (FPGA_to_HPS_state==0 && !(fpga_to_hps_in_csr_readdata[0]) && data_buffer_valid) begin
-//		fpga_to_hps_in_writedata <= data_buffer ;	
-//		fpga_to_hps_in_write <= 1'b1 ;
-//		FPGA_to_HPS_state <= 8'd4 ;
-//hex3_hex0[7:4] <= 4'd4;
-		case(commandCount)
-			1:
-			begin
-				fpga_to_hps_in_writedata <= commandOut.test_cmd ;	
-				fpga_to_hps_in_write <= 1'b1 ;
-				FPGA_to_HPS_state <= 8'd4 ;
-			end
-			2:
-			begin
-				fpga_to_hps_in_writedata <= commandOut.test_dat1 ;	
-				fpga_to_hps_in_write <= 1'b1 ;
-				FPGA_to_HPS_state <= 8'd4 ;
-			end
-			3:
-			begin
-				fpga_to_hps_in_writedata <= commandOut.test_dat2 ;	
-				fpga_to_hps_in_write <= 1'b1 ;
-				FPGA_to_HPS_state <= 8'd4 ;
-			end
-			4:
-			begin
-				fpga_to_hps_in_writedata <= commandOut.test_dat3 ;	
-				fpga_to_hps_in_write <= 1'b1 ;
-				FPGA_to_HPS_state <= 8'd4 ;
-			end
-			default:
-			begin
-				fpga_to_hps_in_writedata <= 9 ;	// crude error signal
-				fpga_to_hps_in_write <= 1'b1 ;
-				FPGA_to_HPS_state <= 8'd4 ;
-			end
-		endcase	
+	if (FPGA_to_HPS_state==0 && !(fpga_to_hps_in_csr_readdata[0]) && fpga_to_hps_in_writedata_valid) begin
+		fpga_to_hps_in_write <= 1'b1 ;
+		FPGA_to_HPS_state <= 1;
 	end
-	
+
 	// finish the write to FPGA_to_HPS FIFO
-	if ((FPGA_to_HPS_state == 4) && (fpga_to_hps_in_write == 1'b1)) begin
+	if (FPGA_to_HPS_state == 1) begin
 		fpga_to_hps_in_write <= 1'b0 ;
-		data_buffer_valid <= 1'b0 ; // used the data, so clear flag
-		FPGA_to_HPS_state <= 8'd8 ;
+		FPGA_to_HPS_state <= 2 ;
 	end
 	
 	// another delay state to see if we need some write time too
-	if ((FPGA_to_HPS_state == 8) && (data_buffer_valid == 1'b0))begin
-		data_buffer_valid <= 1'b0 ; // used the data, so clear flag
-			FPGA_to_HPS_state <= 8'd0 ;
+	if (FPGA_to_HPS_state == 2)begin
+		FPGA_to_HPS_state <= 0;
 	end
-	
-	
-	//==================================
-end // always @(posedge state_clock)
+
+end
 
 
 //=======================================================
