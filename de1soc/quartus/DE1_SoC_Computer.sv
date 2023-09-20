@@ -364,20 +364,16 @@ output					HPS_USB_STP;
 //  REG/WIRE declarations
 //=======================================================
 
-wire			[15: 0]	hex3_hex0;
+
 //wire			[15: 0]	hex5_hex4;
 
-//assign HEX0 = ~hex3_hex0[ 6: 0]; // hex3_hex0[ 6: 0]; 
-//assign HEX1 = ~hex3_hex0[14: 8];
-//assign HEX2 = ~hex3_hex0[22:16];
-//assign HEX3 = ~hex3_hex0[30:24];
-assign HEX4 = 7'b1111111;
-assign HEX5 = 7'b1111111;
+assign HEX0 = 7'b0;
+assign HEX1 = 7'b0;
+assign HEX2 = 7'b0;
+assign HEX3 = 7'b0;
+assign HEX4 = 7'b0;
+assign HEX5 = 7'b0;
 
-HexDigit Digit0(HEX0, hex3_hex0[3:0]);
-HexDigit Digit1(HEX1, hex3_hex0[7:4]);
-HexDigit Digit2(HEX2, hex3_hex0[11:8]);
-HexDigit Digit3(HEX3, hex3_hex0[15:12]);
 
 //=======================================================
 // HPS_to_FPGA FIFO state machine
@@ -445,61 +441,7 @@ typedef struct {
 testCommand commandIn;   // from HPS
 testCommand commandOut;  // to HPS
 reg [7:0]  commandCount = 8'b0;
-wire fastclock;  // this is the clock to drive the timing
-reg start_digcount = 1'b0;
-reg [3:0] digcount_speed = 4'b1;
-reg [31:0]  timecounter = 32'd25000000;
-reg oneSecClock = 1'b0;
-reg doLedInvert = 1'b0;
-reg doLedRun = 1'b0;
-reg [11:0] LEDcount = 12'd0;
-reg doLedSet = 1'b0;
-reg [3:0] setLed;
-reg setCondition;
-reg wasInverted = 1'b0;
 
-
-always @(posedge CLOCK_50) 
-begin 
-	if(timecounter == 32'd0)
-	begin
-		oneSecClock <= ~oneSecClock;
-		timecounter <= 32'd25000000;
-	end
-	else
-	begin
-		timecounter <= timecounter - 32'd1;
-	end
-end
-
-always @(posedge oneSecClock)
-begin
-	if(doLedSet)  // set/clear one led
-	begin
-		LEDR[setLed] = setCondition;
-	end
-	else if(doLedRun == 1'b1)  // sequence the leds
-	begin
-		if(LEDcount > 12'd1023)
-		begin
-			LEDcount <= 12'd0;
-		end
-		else
-		begin
-			LEDcount <= LEDcount + 12'd1;
-		end
-		LEDR <= LEDcount[9:0];
-	end
-	else if(doLedInvert == 1'b1)  // invert the led condition
-	begin
-		LEDR <= ~LEDR;
-		wasInverted <= 1'b1;
-	end
-	else if(doLedInvert == 1'b0)
-	begin
-		wasInverted <= 1'b0;
-	end
-end
 
 //=======================================================
 // do the work outlined above
@@ -508,10 +450,6 @@ always @(posedge CLOCK_50) begin
    // reset state machine and read/write controls
 	if(initEnable == 0) begin
 		sram_write <= 1'b0 ;
-		hex3_hex0[3:0] <= 4'd0;		
-		hex3_hex0[7:4] <= 4'd0;
-		hex3_hex0[11:8] <= 4'd0;
-		hex3_hex0[15:12] <= 4'd0;
 		commandCount <= 0 ;
 		data_buffer_valid <= 1'b0;
 		HPS_to_FPGA_state <= 8'd3 ;
@@ -520,13 +458,6 @@ always @(posedge CLOCK_50) begin
 		initEnable = 1;
 	end  // if(init_enable == 0)
 
-// changing this to - get 4 32-bit words (command-data)
-//                  - act on the command-data	
-//                  - send a response as 4 32-bit words
-	if(wasInverted == 1'b1)  // handshake to turn the invert function off
-	begin
-		doLedInvert <= 1'b0;
-	end
 	// =================================
 	// HPS_to_FPGA state machine
 	//==================================
@@ -604,51 +535,11 @@ always @(posedge CLOCK_50) begin
 //----------------------------
 	// process the command from the FIFO
 	if (Processing_state == 8'd5) begin
-		commandOut.test_cmd <= commandIn.test_cmd;  // success complete
-		commandOut.test_dat1 <= 0;
-		commandOut.test_dat2 <= 0;
-		commandOut.test_dat3 <= 0;
+		commandOut <= commandIn; //echo back whatever they wrote to us
 		commandCount <= 0;
-		case(commandIn.test_cmd)
-		16'd1:  // turn a single led on or off
-		begin
-			setLed <= commandIn.test_dat1[3:0];
-			setCondition <= commandIn.test_dat2[0];
-			doLedSet <= 1'b1;
-			doLedRun <= 1'b0;
-			doLedInvert <= 1'b0;
-			Processing_state <= 8'd6 ; //return a data packet
-		end
-		16'd2:  // invert the condition of the leds
-		begin
-			start_digcount <= 1'b1;
-			commandOut.test_dat1 <= { 24'd0, hex3_hex0[7:4], hex3_hex0[3:0] };
-			digcount_speed <= commandIn.test_dat1[3:0];
-			doLedSet <= 1'b0;
-			doLedRun <= 1'b0;
-			doLedInvert <= 1'b1;
-			commandOut.test_dat1 <= 1;
-			commandOut.test_dat2 <= 2;
-			commandOut.test_dat3 <= 3;
-			Processing_state <= 8'd6 ; //return a data packet
-		end
-		16'd3:  // start a count sequence on the leds
-		begin
-			doLedSet <= 1'b0;
-			doLedRun <= ~doLedRun;  // turn it off if it is on, or on if it is off
-			doLedInvert <= 1'b0;
-			commandOut.test_dat1 <= 4;
-			commandOut.test_dat2 <= 5;
-			commandOut.test_dat3 <= 6;
-			Processing_state <= 8'd6 ; //return a data packet
-		end
+		Processing_state <= 8'd6 ; //return a data packet
+		//TODO; handle logic processing command
 		
-		default:
-		begin
-			commandOut.test_cmd <= 0;  // success complete
-			Processing_state <= 8'd6 ; //return a data packet
-		end
-		endcase
 	end
 
 //-------------------------------------------

@@ -90,137 +90,28 @@ int fd;
 struct timeval t1, t2;
 double elapsedTime;
 
-/* Flag set by `--verbose'. */
-static int verbose_flag = 0;
-int helpopt = 0;
-int term_out = 0;  // default is not for terminal output
+// Sends a command (4 bytes) and shows the resulting command
+void communicate(int data[4], int result[4]) {
+	int i;
+	for (i=0; i<4; i++){
+		FIFO_WRITE_BLOCK(data[i]);
+	}
+	i = 0;
+	// get array from FIFO while there is data in the FIFO
+	for (i = 0; i < 4; i++) {
+		while (READ_FIFO_EMPTY) {};
+		result[i] = FIFO_READ;
+	}
+}
 
 int main (int argc, char *argv[])
-{
-	int local_index;
-	int data[5];  // 8];
-
-  while (1)
-    {
-      static struct option long_options[] =
-    {
-      /* These options don't set a flag.
-         We distinguish them by their indices. */
-      {"verbose",    no_argument,       0, 'v'},
-      {"terminal",    no_argument,       0, 't'},
-      {"help",    no_argument,       0, '?'},
-      {"help",    no_argument,       0, 'h'},
-      {0,         0,                 0,  0}
-    };
-      /* getopt_long stores the option index here. */
-      int option_index = 0;
-
-      int c = getopt_long (argc, argv, "vt?h",
-               long_options, &option_index);
-
-      /* Detect the end of the options. */
-      if (c == -1)
-    break;
-
-      switch (c)
-    {
-    case 0:
-      /* If this option set a flag, do nothing else now. */
-      if (long_options[option_index].flag != 0)
-        break;
-      printf ("option %s", long_options[option_index].name);
-      if (optarg)
-        printf (" with arg %s", optarg);
-      printf ("\n");
-      break;
-    case 'v':
-      puts ("option -v\n");
-      verbose_flag = 1;
-      term_out = 1;
-      break;
-    case 't':
-      if(verbose_flag) puts ("option -t\n");
-      term_out = 1;
-      break;
-    case '?':
-        if(verbose_flag) puts ("option -?\n");
-        helpopt = 1;
-    case 'h':
-      if(helpopt == 0)
-      {
-    	if(verbose_flag)  puts ("option -h\n");
-      }
-      puts("commandOne - this turns a single LED On or Off depending on arguments");
-      puts("  passed in on the command line.");
-      puts("  This has two input parameters which must be entered in this order.");
-      puts("  #1 -> LED number to be modified (0 to 9)");
-      puts("  #2 -> condition value ( 0 or 1 , for OFF and ON");
-      puts("  Option -v prints verbose status output (also sets -t option).");
-      puts("  Option -t outputs as a command line terminal, otherwise output is");
-      puts("     as though the return strings are being passed over a serial interface");
-      puts("    first line - status, second thru fourth line are returned data - (which is");
-      puts("    meaningless in this case).");
-      puts("  Options -? or -h print this help text and does not execute the command.");
-      puts("  Errors are always written to screen.\n");
-      puts("  Example;   ");
-      puts("  > commandOne 3 0 -t ");
-      puts("  > Ok");
-      puts("  This runs the command in terminal mode (interactive use) and turns the");
-      puts("  #3 LED off.  The returned status here shows that the command");
-      puts("  executed correctly.");
-      puts("  > commandOne 2 1");
-      puts("  > 1");
-      puts("  > 0");
-      puts("  > 0");
-      puts("  > 0");
-      puts("  This runs the command in serial mode (RS232 user, so the return values are");
-      puts("  sent as four numeric strings).  The command sets the condition of LED #2 to ON.");
-      puts("  The returned data shows that the command executed correctly.");
-      puts("  The three remaining zeros do not represent anything, just empty arguments.");
-      exit(0);
-      break;
-
-    default:
-      abort ();
-    }
-    }
-
-  if (verbose_flag)
-    puts ("verbose flag is set");
-
-  /* Print any remaining command line arguments (not options). */
-  local_index = 0;
-  data[1] = 4;  // param1
-  data[2] = 4;  // param2, default is invalid argument so if no parameter passed we will not do anything
-  data[3] = 4;  // param3
-  if (optind < argc)
-    {
-	  if (verbose_flag)
-		  printf ("non-option ARGV-elements: \n");
-      while (optind < argc)
-      {  // this line is a warning only so ignore if serial
-    	  local_index++;
-// jmb    	  if(term_out == 1)   printf ("argument %s doesn't make sense for this command\n", argv[optind++]);
-    	  if(local_index == 1) data[1] = atoi(argv[optind]);
-    	  if(local_index == 2) data[2] = atoi(argv[optind]);
-    	  if(local_index == 3) data[3] = atoi(argv[optind]);
-    	  optind++;
-      }
-      if (verbose_flag)
-    	  putchar ('\n');
-    }
-
-
-
+{	
 	// === get FPGA addresses ==================
   // Open /dev/mem
 	if( ( fd = open( "/dev/mem", ( O_RDWR | O_SYNC ) ) ) == -1 )
 	{
-		if(term_out == 1)
-			printf( "ERROR: could not open \"/dev/mem\"...\n" );
-		else
-			printf("0\n0\n0\n0\n");
-		return( 1 );
+		printf( "ERROR: could not open \"/dev/mem\"...\n" );
+		return 1;
 	}
 
 	//============================================
@@ -229,145 +120,49 @@ int main (int argc, char *argv[])
 	// FIFO status registers
 	h2p_lw_virtual_base = mmap( NULL, HW_REGS_SPAN, ( PROT_READ | PROT_WRITE ), MAP_SHARED, fd, HW_REGS_BASE );
 	if( h2p_lw_virtual_base == MAP_FAILED ) {
-		if(term_out == 1)
-			printf( "ERROR: mmap1() failed...\n" );
-		else
-			printf("0\n0\n0\n0\n");
+		printf( "ERROR: mmap1() failed...\n" );
 		close( fd );
-		return(1);
+		return 1;
 	}
 	// the two status registers
 	FIFO_write_status_ptr = (unsigned int *)(h2p_lw_virtual_base);
 	// From Qsys, second FIFO is 0x20
 	FIFO_read_status_ptr = (unsigned int *)(h2p_lw_virtual_base + 0x20); //0x20
 
-	//============================================
-/*
-	// scratch RAM FPGA parameter addr
-	sram_virtual_base = mmap( NULL, FPGA_ONCHIP_SPAN, ( PROT_READ | PROT_WRITE ), MAP_SHARED, fd, FPGA_ONCHIP_BASE);
-
-	if( sram_virtual_base == MAP_FAILED )
-	{
-		if(term_out == 1)
-			printf( "ERROR: mmap3() failed...\n" );
-		else
-			printf("0\n0\n0\n0\n");
-		close( fd );
-		return(1);
-	}
-  // Get the address that maps to the RAM buffer
-	sram_ptr =(unsigned int *)(sram_virtual_base);
-
-	// ===========================================
-*/
 	// FIFO write addr
 	h2p_virtual_base = mmap( NULL, FIFO_SPAN, ( PROT_READ | PROT_WRITE ), MAP_SHARED, fd, FIFO_BASE);
 
 	if( h2p_virtual_base == MAP_FAILED ) {
-		if(term_out == 1)
-			printf( "ERROR: mmap3() failed...\n" );
-		else
-			printf("0\n0\n0\n0\n");
+		printf( "ERROR: mmap3() failed...\n" );
 		close( fd );
 		return(1);
 	}
-  // Get the address that maps to the FIFO read/write ports
+  	// Get the address that maps to the FIFO read/write ports
 	FIFO_write_ptr =(unsigned int *)(h2p_virtual_base);
 	FIFO_read_ptr = (unsigned int *)(h2p_virtual_base + 0x10); //0x10
 
 	//============================================
-	int N ;
-	int retdata[5];
-	long int retparams[3];
-	int i ;
+	const int N  = 4;
+	int data[4];  
+	int result[4];
 
-		N=4;
-		// generate a sequence
-		data[0] = 1;  // command
-//		data[1] = 0;  // param1 hiword
-//		data[2] = 0;  // param1 loword
-//		data[3] = 0;  // param2 hiword
+	data[0] = 0;
+	data[1] = 0;  
+	data[2] = 0;  
+	data[3] = 0;  
 
-		// ======================================
-		// send array to FIFO and read entire block
-		// ======================================
-		// print fill levels
-	    if (verbose_flag)
-	    {
-	    	printf("=====================\n\r");
-	    	printf("fill levels before block write\n\r");
-	    	printf("write=%d read=%d\n\r", WRITE_FIFO_FILL_LEVEL, READ_FIFO_FILL_LEVEL);
-	    }
-		// send array to FIFO and read block
-		for (i=0; i<N; i++){
-			// wait for a slot
-			// do the FIFO write
-			FIFO_WRITE_BLOCK(data[i]);
-		}
-
-	    if (verbose_flag)
-	    {
-	    	printf("fill levels before block read\n\r");
-	 	    printf("write=%d read=%d\n\r", WRITE_FIFO_FILL_LEVEL, READ_FIFO_FILL_LEVEL);
-	    }
-		usleep(30000);  // give the FPGA time to finish working
-
-		// get array from FIFO while there is data in the FIFO
-	    i=0;
-		while (!READ_FIFO_EMPTY) {
-			retdata[i] = FIFO_READ;
-			if (i>N) i=N;
-			// print array from FIFO read port
-	 	    if (verbose_flag)	printf("return=%d %d %d\n\r", retdata[i], WRITE_FIFO_FILL_LEVEL, READ_FIFO_FILL_LEVEL) ;
-	 	    i++;
-		}
-
-		// FIFO fill levels
-	    if (verbose_flag)
-	    {
-	    	printf("fill levels after block read\n\r");
-	    	printf("write=%d read=%d\n\r", WRITE_FIFO_FILL_LEVEL, READ_FIFO_FILL_LEVEL);
-	    	printf("=====================\n\r");
-	    }
-	    // if the function performed successfully the first returned word will be the same as
-	    //  the first word sent (which is the command number)
-	    if(retdata[0] != data[0])
-	    {
-			if(term_out == 1)
-			{
-				printf("ERROR - command did not execute correctly\n\r");
-			}
-			else
-			{
-				printf("0\n");
-				retparams[0] = retdata[1];
-				printf("%ld \n",retparams[0]);
-				retparams[1] = retdata[2];
-				printf("%ld \n",retparams[1]);
-				retparams[2] = retdata[3];
-				printf("%ld \n",retparams[2]);
-			}
-	    }
-	    else
-	    {
-			if(term_out == 1)
-			{
-				printf("Ok\n\r");
-			}
-			else
-			{  // its a serial interface so print strings to return via serial interface
-				printf("%d\n",retdata[0]);
-				retparams[0] = retdata[1];
-				printf("%ld \n",retparams[0]);
-				retparams[1] = retdata[2];
-				printf("%ld \n",retparams[1]);
-				retparams[2] = retdata[3];
-				printf("%ld \n",retparams[2]);
-			}
-	    }
-	    // we will do something with the returned data later
+	// send array to FIFO and read block
+	int j;
+	for (j = 0; j < 10; j++) {
+		data[0] = 1;
+		data[1] = j;
+		printf("Writing data = [%x %x %x %x]\n", data[0], data[1], data[2], data[3]);
+		communicate(data, result);
+		printf("Read data = [%x %x %x %x]\n", result[0], result[1], result[2], result[3]);
+	}
+	printf("Program done\n");
 	exit(0);
-} // end main
+}
 
 //////////////////////////////////////////////////////////////////
 
