@@ -90,20 +90,6 @@ int fd;
 struct timeval t1, t2;
 double elapsedTime;
 
-// Sends a command (4 bytes) and shows the resulting command
-void communicate(int data[4], int result[4]) {
-	int i;
-	for (i=0; i<4; i++){
-		FIFO_WRITE_BLOCK(data[i]);
-	}
-	i = 0;
-	// get array from FIFO while there is data in the FIFO
-	for (i = 0; i < 4; i++) {
-		while (READ_FIFO_EMPTY) {};
-		result[i] = FIFO_READ;
-	}
-}
-
 int main (int argc, char *argv[])
 {	
 	// === get FPGA addresses ==================
@@ -164,7 +150,16 @@ int main (int argc, char *argv[])
 		data[0] = 1;
 		data[1] = j;
 		printf("Writing data = [%x %x %x %x]\n", data[0], data[1], data[2], data[3]);
-		communicate(data, result);
+		int i;
+		for (i=0; i<4; i++){
+			FIFO_WRITE_BLOCK(data[i]);
+		}
+		i = 0;
+		// get array from FIFO while there is data in the FIFO
+		for (i = 0; i < 4; i++) {
+			while (READ_FIFO_EMPTY) {};
+			result[i] = FIFO_READ;
+		}
 		printf("Read data = [%x %x %x %x]\n", result[0], result[1], result[2], result[3]);
 	}
 	printf("Program done\n");
