@@ -141,6 +141,13 @@ int main (int argc, char *argv[])
 	FIFO_write_ptr =(unsigned int *)(h2p_virtual_base);
 	FIFO_read_ptr = (unsigned int *)(h2p_virtual_base + 0x10); //0x10
 
+	// give the FPGA time to finish working
+	usleep(30000);  
+	// Flush any initial contents on the Queue
+	while (!READ_FIFO_EMPTY) {
+		FIFO_READ;
+	}
+
 	//============================================
 	const int N  = 4;
 	int data[4];  

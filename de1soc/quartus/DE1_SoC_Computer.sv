@@ -424,7 +424,7 @@ reg [7:0] FPGA_to_HPS_state ;
 //=======================================================
 
 reg stall_reads = 0; //if this signal is high then we cannot handle more data so pause reading
-de1soc_top de1soc(CLOCK_50, hps_to_fpga_readdata, hps_to_fpga_readdata_valid, fpga_to_hps_in_writedata, fpga_to_hps_in_writedata_valid, fpga_to_hps_stalled, stall_reads);
+de1soc_top de1soc(CLOCK_50, ~initEnable, hps_to_fpga_readdata, hps_to_fpga_readdata_valid, fpga_to_hps_in_writedata, fpga_to_hps_in_writedata_valid, fpga_to_hps_stalled, stall_reads);
 
 assign fpga_to_hps_stalled = (FPGA_to_HPS_state != 1); 
 //=======================================================
@@ -436,7 +436,7 @@ always @(posedge CLOCK_50) begin
 		HPS_to_FPGA_state <= 8'd3 ; //TODO initilize to the read state
 		FPGA_to_HPS_state <= 8'd0 ; 
 		hps_to_fpga_readdata_valid <= 1'b0;
-		initEnable = 1;
+		initEnable <= 1;
 	end
 
 	// =================================
