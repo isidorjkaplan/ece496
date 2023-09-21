@@ -1,6 +1,6 @@
 
 // This is the start of our actual project's DE1SOC adapter
-module de1soc_top(
+module img_buffer_top(
     input wire clock, 
     input wire reset, //+ve synchronous reset
 
@@ -26,4 +26,8 @@ module de1soc_top(
             out_valid <= in_valid;
         end  
     end
+endmodule 
+
+module img_buffer(...);
+
 endmodule 

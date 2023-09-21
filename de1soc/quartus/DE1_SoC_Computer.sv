@@ -423,11 +423,11 @@ reg [7:0] FPGA_to_HPS_state ;
 // Controls for our module we are inserting
 //=======================================================
 
-reg stall_reads = 0; //if this signal is high then we cannot handle more data so pause reading
+reg stall_reads; //if this signal is high then we cannot handle more data so pause reading
 de1soc_top de1soc(CLOCK_50, ~initEnable, hps_to_fpga_readdata, hps_to_fpga_readdata_valid, fpga_to_hps_in_writedata, fpga_to_hps_in_writedata_valid, fpga_to_hps_stalled, stall_reads);
 
 assign fpga_to_hps_stalled = (FPGA_to_HPS_state != 1); 
-//=======================================================
+//==========================s=============================
 // do the work outlined above
 always @(posedge CLOCK_50) begin 
 	// reset state machine and read/write controls
