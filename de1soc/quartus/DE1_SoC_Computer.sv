@@ -412,11 +412,9 @@ reg hps_to_fpga_readdata_valid;
 //=======================================================
 
 reg [31:0] fpga_to_hps_in_writedata ; 
-reg fpga_to_hps_stalled; 
 reg fpga_to_hps_in_writedata_valid ;
 reg fpga_to_hps_in_write ; // write command to HPS
 reg[31:0] fpga_to_hps_in_csr_readdata ;
-
 reg [7:0] FPGA_to_HPS_state ;
   
 //=======================================================
@@ -424,9 +422,17 @@ reg [7:0] FPGA_to_HPS_state ;
 //=======================================================
 
 reg stall_reads; //if this signal is high then we cannot handle more data so pause reading
-de1soc_top de1soc(CLOCK_50, ~initEnable, hps_to_fpga_readdata, hps_to_fpga_readdata_valid, fpga_to_hps_in_writedata, fpga_to_hps_in_writedata_valid, fpga_to_hps_stalled, stall_reads);
+logic [31:0] de1soc_out_value;
+logic de1soc_out_valid;
 
-assign fpga_to_hps_stalled = (FPGA_to_HPS_state != 1); 
+de1soc_top de1soc(.clock(CLOCK_50), .reset(~initEnable), 
+	// Inputs
+	.in_data(hps_to_fpga_readdata), .in_valid(hps_to_fpga_readdata_valid),
+	// Outputs
+	.out_data(de1soc_out_value), .out_valid(de1soc_out_valid), 
+	// Control Flow
+	.downstream_stall(fpga_to_hps_in_writedata_valid), .upstream_stall(stall_reads));
+
 //==========================s=============================
 // do the work outlined above
 always @(posedge CLOCK_50) begin 
@@ -436,6 +442,7 @@ always @(posedge CLOCK_50) begin
 		HPS_to_FPGA_state <= 8'd3 ; //TODO initilize to the read state
 		FPGA_to_HPS_state <= 8'd0 ; 
 		hps_to_fpga_readdata_valid <= 1'b0;
+		fpga_to_hps_in_writedata_valid <= 1'b0;
 		initEnable <= 1;
 	end
 
@@ -471,10 +478,14 @@ always @(posedge CLOCK_50) begin
 		hps_to_fpga_readdata_valid <= 1'b0;
 	end
 
-
 	// =================================
 	// FPGA_to_HPS state machine
 	//================================== 
+	if (de1soc_out_valid == 1) begin
+		fpga_to_hps_in_writedata <= de1soc_out_value;
+		fpga_to_hps_in_writedata_valid <= 1;
+	end
+
 	// is there space in the 
 	// FPGA_to_HPS FIFO
 	// and data is available
@@ -482,7 +493,7 @@ always @(posedge CLOCK_50) begin
 		fpga_to_hps_in_write <= 1'b1 ;
 		FPGA_to_HPS_state <= 1;
 	end
-
+	
 	// finish the write to FPGA_to_HPS FIFO
 	if (FPGA_to_HPS_state == 1) begin
 		fpga_to_hps_in_write <= 1'b0 ;
@@ -492,6 +503,7 @@ always @(posedge CLOCK_50) begin
 	// another delay state to see if we need some write time too
 	if (FPGA_to_HPS_state == 2)begin
 		FPGA_to_HPS_state <= 0;
+		fpga_to_hps_in_writedata_valid <= 0;
 	end
 
 end

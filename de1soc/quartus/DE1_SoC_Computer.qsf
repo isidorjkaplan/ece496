@@ -970,7 +970,7 @@ set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to *
 set_global_assignment -name TIMEQUEST_MULTICORNER_ANALYSIS ON
 set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
 set_global_assignment -name FITTER_EFFORT "AUTO FIT"
-set_global_assignment -name SMART_RECOMPILE ON
+set_global_assignment -name SMART_RECOMPILE OFF
 set_global_assignment -name SYSTEMVERILOG_FILE ../../verilog/img_preproc.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../verilog/img_model.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../verilog/de1soc_top.sv

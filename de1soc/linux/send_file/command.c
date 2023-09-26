@@ -130,39 +130,74 @@ int main (int argc, char *argv[])
 	// give the FPGA time to finish working
 	usleep(30000);  
 	// Flush any initial contents on the Queue
+	
+	int i = 0;
 	while (!READ_FIFO_EMPTY) {
 		FIFO_READ;
+		if (i > 1000) {
+			printf("Failed to flush FIFO queue!\n");
+			break;
+		}
+		i++;
 	}
 
 	//============================================
-	const int N  = 4;
-	int data[4];  
-	int result[4];
-
-	data[0] = 0;
-	data[1] = 0;  
-	data[2] = 0;  
-	data[3] = 0;  
-
-	// send array to FIFO and read block
-	int j;
-	for (j = 0; j < 10; j++) {
-		data[0] = 1;
-		data[1] = j;
-		printf("Writing data = [%x %x %x %x]\n", data[0], data[1], data[2], data[3]);
-		int i;
-		for (i=0; i<4; i++){
-			FIFO_WRITE_BLOCK(data[i]);
-		}
-		i = 0;
-		// get array from FIFO while there is data in the FIFO
-		for (i = 0; i < 4; i++) {
-			while (READ_FIFO_EMPTY) {};
-			result[i] = FIFO_READ;
-		}
-		printf("Read data = [%x %x %x %x]\n", result[0], result[1], result[2], result[3]);
+	if (argc <= 1) {
+		printf("sudo ./command <file.ppm>\n");
 	}
-	printf("Program done\n");
+
+	#define dprintf
+
+	printf("Opening file %s\n", argv[1]);
+	FILE* f = fopen(argv[1], "rb");
+	
+	if (!f) {
+		fprintf(stderr, "Failed to open file: %s\n", argv[1]);
+		exit(1);
+	}
+
+	/*int size;
+
+	// Get size
+	fseek(f, 0, SEEK_END);
+	size = ftell(f);
+	rewind(f);
+
+	printf("File is %d bytes\n", size);
+
+	int m_width, m_height;
+	fscanf(f, "P6\n %d %d\n255\n", &m_width, &m_height);
+	printf("Read m_width=%d, m_height=%d\n", m_width, m_height);
+	
+	printf("Program done\n"); */
+
+
+	
+	printf("Writing: ");
+	while(!feof(f))
+	{
+		if (i % 8 == 0) dprintf("\n\t");
+		unsigned int word;
+		fread(&word,sizeof(word),1,f);
+		dprintf("%-10x", word);
+		FIFO_WRITE_BLOCK(word);
+		i++;
+	}
+
+	printf("\nDone Writing\n");
+
+	// give the FPGA time to finish working
+	//usleep(30000);  
+	// Flush any initial contents on the Queue
+	while (!READ_FIFO_EMPTY) {
+		unsigned int data = FIFO_READ;
+		printf("Read word=0x%x, idle=%d, out_valid=%d, x=%d, y=%d, width=%d, height=%d\n", data,
+			(data>>7)&1, (data>>15)&1, 
+			0b01111111 & data, 0b01111111 & (data>>8), 
+			0xFF & (data >> 16), 0xFF & (data >> 24));
+	}
+
+	printf("Program Done\n");
 	exit(0);
 }
 
