@@ -61,6 +61,7 @@
 *~
 *example*
 *sopc_*
+*summary.csv
 # *.sdc # I want those timing files
 
 # ignore Quartus II generated folders
@@ -75,8 +76,8 @@ db/
 _output_files/
 PLLJ_PLLSPE_INFO.txt
 
-*/c_model/jpeg
-*/c_model/obj/
+lib/core_jpeg/c_model/jpeg
+lib/core_jpeg/c_model/obj/
 
 work/
 */work
