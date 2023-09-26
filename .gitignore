@@ -75,5 +75,7 @@ db/
 _output_files/
 PLLJ_PLLSPE_INFO.txt
 
+*/c_model/{jpeg,obj/}
+
 work/
 */work
