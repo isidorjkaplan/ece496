@@ -30,10 +30,8 @@
 */hps_isw_handoff
 */hps_sdram_p0_summary.csv
 
-*.cmp.rmb
-*.cmp.*
-
-*.rmb
+*.db_info
+*.rdb
 
 # ignore Quartus II generated files
 *_generation_script*
