@@ -1,3 +1,0 @@
-[submodule "lib/core_jpeg"]
-	path = lib/core_jpeg
-	url = https://github.com/ultraembedded/core_jpeg
