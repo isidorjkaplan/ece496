@@ -14,20 +14,33 @@ module img_preproc_top(
     output wire upstream_stall
 );
 
-    assign upstream_stall = out_valid && downstream_stall;
+    // // Inputs
+    // ,input  [ 31:0]  inport_data_i
+    // ,input  [  3:0]  inport_strb_i
+    // // Outputs
+    // ,output [ 15:0]  outport_width_o
+    // ,output [ 15:0]  outport_height_o
+    // ,output [ 15:0]  outport_pixel_x_o
+    // ,output [ 15:0]  outport_pixel_y_o
+    // ,output [  7:0]  outport_pixel_r_o
+    // ,output [  7:0]  outport_pixel_g_o
+    // ,output [  7:0]  outport_pixel_b_o
     
-    always_ff@(posedge clock) begin
-        if (reset) begin
-            out_data <= 0;
-            out_valid <= 0;
-        end
-        else if (!downstream_stall || !out_valid) begin
-            out_data <= in_data;
-            out_valid <= in_valid;
-        end  
-    end
-endmodule 
+    jpeg_core jpeg( 
+        .clk_i(clock), .rst_i(reset),
+        .inport_valid_i(in_valid),
+        .inport_data_i(in_data),
+        .inport_strb_i(4'hf), //all bytes are valid (for now)
+        .outport_accept_i(~downstream_stall),
 
-module img_preproc(...);
-
+        .inport_accept_o(~upstream_stall),
+        .outport_valid_o(out_valid),
+        .outport_width_o(15'b0),
+        .outport_height_o(15'b0),
+        .outport_pixel_x_o(out_data[15:0]),
+        .outport_pixel_y_o(out_data[31:16]),
+        .outport_pixel_r_o(8'b0),
+        .outport_pixel_g_o(8'b0),
+        .outport_pixel_b_o(8'b0),
+        .idle_o(1'b0));
 endmodule 

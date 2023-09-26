@@ -13,19 +13,8 @@ module de1soc_top(
     input wire downstream_stall,
     output wire upstream_stall
 );
-
-    assign upstream_stall = out_valid && downstream_stall;
-    
-    always_ff@(posedge clock) begin
-        if (reset) begin
-            out_data <= 0;
-            out_valid <= 0;
-        end
-        else if (!downstream_stall || !out_valid) begin
-            out_data <= in_data;
-            out_valid <= in_valid;
-        end  
-    end
-
-    jpeg_core jpeg(1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0);
+    img_preproc_top preproc_mod(.clock(clock), .reset(reset), 
+        .in_data(in_data), .in_valid(in_valid), .out_data(out_data), .out_valid(out_valid), 
+        .downstream_stall(downstream_stall), .upstream_stall(upstream_stall));
+        
 endmodule 

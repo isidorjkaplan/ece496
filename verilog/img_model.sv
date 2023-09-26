@@ -27,7 +27,4 @@ module img_model_top(
         end  
     end
 endmodule 
-
-module img_model(...);
-
-endmodule 
+ 
