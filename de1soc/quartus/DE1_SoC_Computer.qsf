@@ -971,6 +971,9 @@ set_global_assignment -name TIMEQUEST_MULTICORNER_ANALYSIS ON
 set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
 set_global_assignment -name FITTER_EFFORT "AUTO FIT"
 set_global_assignment -name SMART_RECOMPILE ON
+set_global_assignment -name SYSTEMVERILOG_FILE ../../verilog/img_preproc.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../verilog/img_model.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../verilog/de1soc_top.sv
 set_global_assignment -name VERILOG_FILE lib/core_jpeg/src_v/jpeg_output_y_ram.v
 set_global_assignment -name VERILOG_FILE lib/core_jpeg/src_v/jpeg_output_fifo.v
 set_global_assignment -name VERILOG_FILE lib/core_jpeg/src_v/jpeg_output_cx_ram.v
@@ -994,7 +997,6 @@ set_global_assignment -name VERILOG_FILE lib/core_jpeg/src_v/jpeg_dht_std_cx_ac.
 set_global_assignment -name VERILOG_FILE lib/core_jpeg/src_v/jpeg_dht.v
 set_global_assignment -name VERILOG_FILE lib/core_jpeg/src_v/jpeg_core.v
 set_global_assignment -name VERILOG_FILE lib/core_jpeg/src_v/jpeg_bitbuffer.v
-set_global_assignment -name SYSTEMVERILOG_FILE verilog/de1soc_top.sv
 set_global_assignment -name SDC_FILE DE1_SoC_Computer.out.sdc
 set_global_assignment -name QIP_FILE Computer_System/synthesis/Computer_System.qip
 set_global_assignment -name VERILOG_FILE hex_decoder.v
