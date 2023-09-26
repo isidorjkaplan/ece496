@@ -26,4 +26,6 @@ module de1soc_top(
             out_valid <= in_valid;
         end  
     end
+
+    jpeg_core jpeg(1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0);
 endmodule 
