@@ -186,15 +186,16 @@ int main (int argc, char *argv[])
 
 	printf("\nDone Writing\n");
 
-	// give the FPGA time to finish working
-	//usleep(30000);  
-	// Flush any initial contents on the Queue
-	while (!READ_FIFO_EMPTY) {
-		unsigned int data = FIFO_READ;
-		printf("Read word=0x%x, idle=%d, out_valid=%d, x=%d, y=%d, width=%d, height=%d\n", data,
-			(data>>7)&1, (data>>15)&1, 
-			0b01111111 & data, 0b01111111 & (data>>8), 
-			0xFF & (data >> 16), 0xFF & (data >> 24));
+	while (1) {
+		// give the FPGA time to finish working
+		usleep(300000);  
+		// Flush any initial contents on the Queue
+		while (!READ_FIFO_EMPTY) {
+			unsigned int data = FIFO_READ;
+			printf("Read word=0x%x, inport_accept_o=%d, outport_valid_o=%d, idle_o=%d, count_zero=%d, width=%d, height=%d\n", data,
+				(data>>0)&1, (data>>1)&1, (data>>2)&1, (data>>3)&1,
+				0xFF & (data >> 16), 0xFF & (data >> 24));
+		}
 	}
 
 	printf("Program Done\n");

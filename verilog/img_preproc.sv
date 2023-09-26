@@ -32,20 +32,28 @@ module img_preproc_top(
         .inport_strb_i(4'hf), //all bytes are valid (for now)
         .outport_accept_i(1'b1),
 
-        .inport_accept_o(1'b1),
-        .outport_valid_o(out_valid),
+        .inport_accept_o(out_data[0]),
+        .outport_valid_o(out_data[1]),
         .outport_width_o(out_data[23:16]),
         .outport_height_o(out_data[31:24]),
-        .outport_pixel_x_o(out_data[6:0]),
-        .outport_pixel_y_o(out_data[14:8]),
+        .outport_pixel_x_o(1'b0),
+        .outport_pixel_y_o(1'b0),
         .outport_pixel_r_o(8'b0),
         .outport_pixel_g_o(8'b0),
         .outport_pixel_b_o(8'b0),
-        .idle_o(out_data[15]));
-        
-    assign out_data[7] = out_valid;
-    // For some reason it was sending when out_valid=0 so something seems fishy, even valid-bit out[7] was zero; so really strange
-    // When out_valid=(count==0) AND top-level was waiting on register + waiting on this out_valid than than it was still spamming
+        .idle_o(out_data[2]));
+
+    // For debugging so we can see a status output ~5 sec even if jpeg_core did not send a valid packet
+    // This can be identified since out[7]=valid=0 on such a packet
+    logic [27 : 0 ] count;
+    always_ff @ (posedge clock) begin
+        count <= (count + 1);
+    end
+
+    assign out_data[3] = (count == 0);
+
+    assign out_valid = out_data[3] || out_data[1];
+    
     assign upstream_stall = 1'b0;
 
 endmodule 

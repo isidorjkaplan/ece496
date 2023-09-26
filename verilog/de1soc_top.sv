@@ -13,7 +13,7 @@ module de1soc_top(
     input wire downstream_stall,
     output wire upstream_stall
 );
-    img_model_top preproc_mod(.clock(clock), .reset(reset), 
+    img_preproc_top preproc_mod(.clock(clock), .reset(reset), 
         .in_data(in_data), .in_valid(in_valid), .out_data(out_data), .out_valid(out_valid), 
         .downstream_stall(downstream_stall), .upstream_stall(upstream_stall));
         
