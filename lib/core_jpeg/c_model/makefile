@@ -8,7 +8,7 @@ TARGET	   ?= jpeg
 # Source Files
 SRC_DIR    = .
 
-CFLAGS	    = -O2 -fPIC
+CFLAGS	    = -O0 -fPIC -g
 CFLAGS     += -Wno-format
 
 INCLUDE_PATH += $(SRC_DIR)

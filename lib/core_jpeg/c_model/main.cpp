@@ -73,10 +73,12 @@ static void ConvertYUV2RGB(int block_num, int *y, int *cb, int *cr)
             int _y = y_start + (i / 8);
             int offset = (_y * m_width) + _x;
 
-            dprintf("RGB: r=%d g=%d b=%d -> %d\n", r, g, b, offset);
-            m_output_r[offset] = r;
-            m_output_g[offset] = g;
-            m_output_b[offset] = b;
+            if (offset < m_width*m_height) {
+                dprintf("RGB: r=%d g=%d b=%d -> %d\n", r, g, b, offset);
+                m_output_r[offset] = r;
+                m_output_g[offset] = g;
+                m_output_b[offset] = b;
+            }
         }
     }
     else
