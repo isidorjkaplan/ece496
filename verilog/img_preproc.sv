@@ -30,6 +30,7 @@ module img_preproc_top(
         .inport_valid_i(in_valid),
         .inport_data_i(in_data),
         .inport_strb_i(4'hf), //all bytes are valid (for now)
+        .inport_last_i(TODO),
         .outport_accept_i(1'b1),
 
         .inport_accept_o(out_data[0]),
