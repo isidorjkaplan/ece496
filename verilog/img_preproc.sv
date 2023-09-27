@@ -12,49 +12,95 @@ module img_preproc_top(
 
     input wire downstream_stall,
     output wire upstream_stall
-);
-    
-    // // Inputs
-    // ,input  [ 31:0]  inport_data_i
-    // ,input  [  3:0]  inport_strb_i
-    // // Outputs
-    // ,output [ 15:0]  outport_width_o
-    // ,output [ 15:0]  outport_height_o
-    // ,output [ 15:0]  outport_pixel_x_o
-    // ,output [ 15:0]  outport_pixel_y_o
-    // ,output [  7:0]  outport_pixel_r_o
-    // ,output [  7:0]  outport_pixel_g_o
-    // ,output [  7:0]  outport_pixel_b_o    
-    jpeg_core jpeg( 
-        .clk_i(clock), .rst_i(reset),
-        .inport_valid_i(in_valid),
-        .inport_data_i(in_data),
-        .inport_strb_i(4'hf), //all bytes are valid (for now)
-        .inport_last_i(TODO),
-        .outport_accept_i(1'b1),
+);  
 
-        .inport_accept_o(out_data[0]),
-        .outport_valid_o(out_data[1]),
-        .outport_width_o(out_data[23:16]),
-        .outport_height_o(out_data[31:24]),
-        .outport_pixel_x_o(1'b0),
-        .outport_pixel_y_o(1'b0),
-        .outport_pixel_r_o(8'b0),
-        .outport_pixel_g_o(8'b0),
-        .outport_pixel_b_o(8'b0),
-        .idle_o(out_data[2]));
+    //JPEG CORE PORTS
 
-    // For debugging so we can see a status output ~5 sec even if jpeg_core did not send a valid packet
-    // This can be identified since out[7]=valid=0 on such a packet
-    logic [27 : 0 ] count;
+    logic [ 15:0]  outport_width_o;
+    logic [ 15:0]  outport_height_o;
+    logic [ 15:0]  outport_pixel_x_o;
+    logic [ 15:0]  outport_pixel_y_o;
+    logic [  7:0]  outport_pixel_r_o;
+    logic [  7:0]  outport_pixel_g_o;
+    logic [  7:0]  outport_pixel_b_o ; 
+    logic outport_valid_o;
+    logic idle_o;
+    logic inport_accept_o;
+
+    // WORD COUNT LOGIC
+
+    logic [31 : 0] word_count;
     always_ff @ (posedge clock) begin
-        count <= (count + 1);
+        // Reset by setting count to zero, implying we are not actively recieving anything
+        if (reset) begin
+            word_count <= 0;
+        end
+        // If we are not actively in an image and we randomly recieve a word, that is the start of new image
+        else if (word_count == 0 && in_valid) begin
+            word_count <= in_data;
+        end
+        // We are processing and recieved another byte so process it 
+        else if (in_valid && inport_accept_o) begin
+            word_count <= (word_count - 1);
+        end
     end
 
-    assign out_data[3] = (count == 0);
-
-    assign out_valid = out_data[3] || out_data[1];
+    // TIMEOUT LOGIC
+    // TODO; this is not gonna be in final thing
     
-    assign upstream_stall = 1'b0;
+    parameter TIMEOUT_CYCLES = 32'h2FAF080; // 50 MILLION cycles = 1 second
+    logic [31 : 0 ] timeout_count;
+    logic timeout;
+    assign timeout = (timeout_count==0);
+    always_ff @ (posedge clock) begin
+        if (reset) begin
+            timeout_count <= 0;
+        end
+        else if (timeout_count != 0) begin
+            timeout_count <= (timeout_count - 1);
+        end
+        //TODO; also must only do this when we initially set word_count
+        else if (timeout_count == 0) begin
+            timeout_count <= TIMEOUT_CYCLES;
+        end
+    end
+
+    // JPEG declaration
+
+    jpeg_core jpeg( 
+        .clk_i(clock), .rst_i(reset),
+        .inport_valid_i(in_valid && (word_count != 0)), //valid unless we are waiting to start something new
+        .inport_data_i(in_data),
+        .inport_strb_i(4'hf), //all bytes are valid (for now)
+        .inport_last_i(word_count==1 && in_valid), //last cycle of valid data  
+        .outport_accept_i(~downstream_stall), //can accept when not stalling downstream
+
+        // For now putting this here since we do logic with it seperately
+        .inport_accept_o(inport_accept_o),
+        .outport_valid_o(outport_valid_o),
+        .outport_width_o(outport_width_o),
+        .outport_height_o(outport_height_o),
+        .outport_pixel_x_o(outport_pixel_x_o),
+        .outport_pixel_y_o(outport_pixel_y_o),
+        .outport_pixel_r_o(outport_pixel_r_o),
+        .outport_pixel_g_o(outport_pixel_g_o),
+        .outport_pixel_b_o(outport_pixel_b_o),
+        .idle_o(idle_o));
+
+    // JPEG CORE ASSIGNMENTS
+    assign upstream_stall = (word_count==0)? 1'b0 : (~inport_accept_o); // Can always latch word size, must wait for rest
+
+    // OUTPUT HACK
+
+    assign out_data[31:24] = word_count;
+    assign out_data[0] = inport_accept_o;
+    assign out_data[1] = outport_valid_o;
+    assign out_data[2] = idle_o;
+    assign out_data[3] = timeout;
+    // Ensure it does not get optimized away
+    assign out_data[4] = ^{outport_width_o, outport_height_o, outport_pixel_x_o, outport_pixel_y_o, outport_pixel_r_o, outport_pixel_g_o, outport_pixel_b_o};
+ 
+    // For now
+    assign out_valid = outport_valid_o || timeout;
 
 endmodule 

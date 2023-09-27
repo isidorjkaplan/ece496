@@ -24,6 +24,7 @@
 #include <math.h>
 #include <getopt.h>
 #include <unistd.h>
+#include <assert.h>
 
 // main bus; scratch RAM
 // used only for testing
@@ -156,43 +157,35 @@ int main (int argc, char *argv[])
 		exit(1);
 	}
 
-	/*int size;
-
+	int size;
 	// Get size
 	fseek(f, 0, SEEK_END);
 	size = ftell(f);
+	//assert(size % 4 == 0);
+	size = (size+3) / 4;
 	rewind(f);
 
-	printf("File is %d bytes\n", size);
-
-	int m_width, m_height;
-	fscanf(f, "P6\n %d %d\n255\n", &m_width, &m_height);
-	printf("Read m_width=%d, m_height=%d\n", m_width, m_height);
+	printf("File is %d words (4 bytes/word)\n", size);
 	
-	printf("Program done\n"); */
-
-
-	
-	printf("Writing: ");
+	i = 0;
+	FIFO_WRITE_BLOCK(size);
 	while(!feof(f))
 	{
-		if (i % 8 == 0) dprintf("\n\t");
 		unsigned int word;
 		fread(&word,sizeof(word),1,f);
-		dprintf("%-10x", word);
 		FIFO_WRITE_BLOCK(word);
 		i++;
+		//if (size-i == 20) break;
 	}
-
-	printf("\nDone Writing\n");
+	printf("Wrote %d of %d words from file.\n", i, size);
 
 	while (1) {
 		// give the FPGA time to finish working
-		usleep(300000);  
+		usleep(3000);  
 		// Flush any initial contents on the Queue
 		while (!READ_FIFO_EMPTY) {
 			unsigned int data = FIFO_READ;
-			printf("Read word=0x%x, inport_accept_o=%d, outport_valid_o=%d, idle_o=%d, count_zero=%d, width=%d, height=%d\n", data,
+			printf("Read word=0x%x, inport_accept_o=%d, outport_valid_o=%d, idle_o=%d, count_zero=%d, empty=%d, word_count=%d\n", data,
 				(data>>0)&1, (data>>1)&1, (data>>2)&1, (data>>3)&1,
 				0xFF & (data >> 16), 0xFF & (data >> 24));
 		}
