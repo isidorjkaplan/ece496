@@ -59,6 +59,7 @@ module jpeg_core
     ,output [  7:0]  outport_pixel_r_o
     ,output [  7:0]  outport_pixel_g_o
     ,output [  7:0]  outport_pixel_b_o
+    ,output [ 15:0]  outport_debug_tap_o
     ,output          idle_o
 );
 
@@ -144,6 +145,8 @@ u_jpeg_input
     ,.data_valid_o(bb_inport_valid_w)
     ,.data_data_o(bb_inport_data_w)
     ,.data_last_o(bb_inport_last_w)
+
+    ,.outport_debug_tap_o(outport_debug_tap_o)
 );
 
 

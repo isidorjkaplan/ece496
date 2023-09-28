@@ -92,10 +92,19 @@ struct timeval t1, t2;
 double elapsedTime;
 
 
+#define MIN(x, y) ((x<=y)?x:y)
+
 void print_data(unsigned int data) {
-	printf("Read word=0x%x, inport_accept_o=%d, outport_valid_o=%d, idle_o=%d, count_zero=%d, empty=%d, word_count=%d\n", data,
+	printf("Read word=0x%x, inport_accept_o=%d, outport_valid_o=%d, idle_o=%d, count_zero=%d, jpeg_debug_tap=%d, word_count=%d\n", data,
 				(data>>0)&1, (data>>1)&1, (data>>2)&1, (data>>3)&1,
 				0xFF & (data >> 16), 0xFF & (data >> 24));
+}
+
+void read_next() { 
+	while (READ_FIFO_EMPTY) {
+		usleep(1000); 
+	}
+	print_data(FIFO_READ);
 }
 
 int main (int argc, char *argv[])
@@ -165,7 +174,6 @@ int main (int argc, char *argv[])
 		fseek(f, 0, SEEK_END);
 		size = ftell(f);
 		//assert(size % 4 == 0);
-		size = (size+3) / 4;
 		rewind(f);
 
 		printf("File is %d words (4 bytes/word)\n", size);
@@ -176,26 +184,32 @@ int main (int argc, char *argv[])
 		//tell it how many words we will send
 		FIFO_WRITE_BLOCK(size);
 		//send the words
-		while(!feof(f))
+		while(!feof(f) && i < size)
 		{
 			unsigned int word;
-			fread(&word,sizeof(word),1,f);
+			//cannot do more then 4 bytes at a time
+			unsigned int bytes = MIN(size-i, 4); 
+			fread(&word, bytes, 1,f);
 			FIFO_WRITE_BLOCK(word);
-			i++;
+			i+=bytes;
+			read_next();
 			//if (size-i == 20) break;
 		}
-		printf("Wrote %d of %d words from file.\n", i, size);
+		printf("Wrote %d of %d bytes from file.\n", i, size);
+		fclose(f);
 
 	}
 
-	while (1) {
+	i = 0;
+	while (i < 100*30) {
 		// give the FPGA time to finish working
-		usleep(3000);  
+		usleep(10000);  
 		// Flush any initial contents on the Queue
 		while (!READ_FIFO_EMPTY) {
-			unsigned int data = FIFO_READ;
-			print_data(data);
+			FIFO_READ;
+			print_data(FIFO_READ);
 		}
+		i++;
 	}
 
 	printf("Program Done\n");

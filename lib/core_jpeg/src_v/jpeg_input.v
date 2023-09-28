@@ -61,6 +61,7 @@ module jpeg_input
     ,output          data_valid_o
     ,output [  7:0]  data_data_o
     ,output          data_last_o
+    ,output [ 15:0]  outport_debug_tap_o
 );
 
 
@@ -151,6 +152,8 @@ localparam STATE_SOF_DATA    = 5'd17;
 
 reg [STATE_W-1:0] state_q;
 reg [15:0]        length_q;
+
+assign outport_debug_tap_o = state_q;
 
 reg [STATE_W-1:0] next_state_r;
 always @ *
