@@ -95,7 +95,7 @@ double elapsedTime;
 #define MIN(x, y) ((x<=y)?x:y)
 
 void print_data(unsigned int data) {
-	printf("Read word=0x%x, inport_accept_o=%d, outport_valid_o=%d, idle_o=%d, count_zero=%d, jpeg_debug_tap=%d, word_count=%d\n", data,
+	printf("Read word=0x%x, inport_accept_o=%d, outport_width_o_nonzero=%d, idle_o=%d, count_zero=%d, jpeg_debug_tap=%d, word_count=%d\n", data,
 				(data>>0)&1, (data>>1)&1, (data>>2)&1, (data>>3)&1,
 				0xFF & (data >> 16), 0xFF & (data >> 24));
 }
@@ -189,7 +189,7 @@ int main (int argc, char *argv[])
 			unsigned int word;
 			//cannot do more then 4 bytes at a time
 			unsigned int bytes = MIN(size-i, 4); 
-			fread(&word, bytes, 1,f);
+			fread(&word, 1, bytes,f);
 			FIFO_WRITE_BLOCK(word);
 			i+=bytes;
 			read_next();

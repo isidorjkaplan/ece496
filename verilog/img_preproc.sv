@@ -113,7 +113,7 @@ module img_preproc_top(
     assign out_data[31:24] = byte_count;
     assign out_data[23:16] = outport_debug_tap_o;
     assign out_data[0] = inport_accept_o;
-    assign out_data[1] = outport_valid_o;
+    assign out_data[1] = outport_width_o != 0;
     assign out_data[2] = idle_o;
     assign out_data[3] = timeout;
     // Ensure it does not get optimized away
