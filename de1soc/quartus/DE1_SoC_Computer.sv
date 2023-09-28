@@ -439,7 +439,7 @@ always @(posedge CLOCK_50) begin
 	// reset state machine and read/write controls
 	if(initEnable == 0) begin
 		sram_write <= 1'b0 ;
-		HPS_to_FPGA_state <= 8'd3 ; //TODO initilize to the read state
+		HPS_to_FPGA_state <= 8'd0 ; //TODO initilize to the read state
 		FPGA_to_HPS_state <= 8'd0 ; 
 		hps_to_fpga_readdata_valid <= 1'b0;
 		fpga_to_hps_in_writedata_valid <= 1'b0;
@@ -451,7 +451,7 @@ always @(posedge CLOCK_50) begin
 	//==================================
 	// Is there data in HPS_to_FPGA FIFO
 	// and the last transfer is complete
-	if (HPS_to_FPGA_state == 8'd0 && !(hps_to_fpga_out_csr_readdata[1]) && !stall_reads)  begin
+	if (HPS_to_FPGA_state == 8'd0 && !(hps_to_fpga_out_csr_readdata[1]))  begin
 		hps_to_fpga_read <= 1'b1 ;
 		HPS_to_FPGA_state <= 8'd1 ;
 	end
@@ -465,7 +465,7 @@ always @(posedge CLOCK_50) begin
 	end
 
 	// read the word from the FIFO
-	if ((HPS_to_FPGA_state == 8'd2)) begin
+	if (HPS_to_FPGA_state == 8'd2) begin
 		//TODO READ THE DATA 
 		hps_to_fpga_readdata_valid <= 1'b1;
 		HPS_to_FPGA_state <= 8'd3 ;  // wait and then go back to start of FSM
@@ -473,7 +473,7 @@ always @(posedge CLOCK_50) begin
 
 	// delay  FOR THE TRIP BACK FROM STATE 4 TO STATE 0
 	// this test checks to see if we need more fifo read time
-	if (HPS_to_FPGA_state == 8'd3) begin
+	if (HPS_to_FPGA_state == 8'd3 && !stall_reads) begin
 		HPS_to_FPGA_state <= 8'd0 ;
 		hps_to_fpga_readdata_valid <= 1'b0;
 	end

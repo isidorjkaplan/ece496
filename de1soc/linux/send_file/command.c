@@ -91,6 +91,13 @@ int fd;
 struct timeval t1, t2;
 double elapsedTime;
 
+
+void print_data(unsigned int data) {
+	printf("Read word=0x%x, inport_accept_o=%d, outport_valid_o=%d, idle_o=%d, count_zero=%d, empty=%d, word_count=%d\n", data,
+				(data>>0)&1, (data>>1)&1, (data>>2)&1, (data>>3)&1,
+				0xFF & (data >> 16), 0xFF & (data >> 24));
+}
+
 int main (int argc, char *argv[])
 {	
 	// === get FPGA addresses ==================
@@ -134,7 +141,7 @@ int main (int argc, char *argv[])
 	
 	int i = 0;
 	while (!READ_FIFO_EMPTY) {
-		FIFO_READ;
+		print_data(FIFO_READ);
 		if (i > 1000) {
 			printf("Failed to flush FIFO queue!\n");
 			break;
@@ -143,41 +150,43 @@ int main (int argc, char *argv[])
 	}
 
 	//============================================
-	if (argc <= 1) {
-		printf("sudo ./command <file.ppm>\n");
+	printf("sudo ./command <file.ppm>\n");
+	if (argc == 2) {
+		printf("Opening file %s\n", argv[1]);
+		FILE* f = fopen(argv[1], "rb");
+		
+		if (!f) {
+			fprintf(stderr, "Failed to open file: %s\n", argv[1]);
+			exit(1);
+		}
+
+		int size;
+		// Get size
+		fseek(f, 0, SEEK_END);
+		size = ftell(f);
+		//assert(size % 4 == 0);
+		size = (size+3) / 4;
+		rewind(f);
+
+		printf("File is %d words (4 bytes/word)\n", size);
+		
+		i = 0;
+		//reset the device
+		FIFO_WRITE_BLOCK(0);
+		//tell it how many words we will send
+		FIFO_WRITE_BLOCK(size);
+		//send the words
+		while(!feof(f))
+		{
+			unsigned int word;
+			fread(&word,sizeof(word),1,f);
+			FIFO_WRITE_BLOCK(word);
+			i++;
+			//if (size-i == 20) break;
+		}
+		printf("Wrote %d of %d words from file.\n", i, size);
+
 	}
-
-	#define dprintf
-
-	printf("Opening file %s\n", argv[1]);
-	FILE* f = fopen(argv[1], "rb");
-	
-	if (!f) {
-		fprintf(stderr, "Failed to open file: %s\n", argv[1]);
-		exit(1);
-	}
-
-	int size;
-	// Get size
-	fseek(f, 0, SEEK_END);
-	size = ftell(f);
-	//assert(size % 4 == 0);
-	size = (size+3) / 4;
-	rewind(f);
-
-	printf("File is %d words (4 bytes/word)\n", size);
-	
-	i = 0;
-	FIFO_WRITE_BLOCK(size);
-	while(!feof(f))
-	{
-		unsigned int word;
-		fread(&word,sizeof(word),1,f);
-		FIFO_WRITE_BLOCK(word);
-		i++;
-		//if (size-i == 20) break;
-	}
-	printf("Wrote %d of %d words from file.\n", i, size);
 
 	while (1) {
 		// give the FPGA time to finish working
@@ -185,9 +194,7 @@ int main (int argc, char *argv[])
 		// Flush any initial contents on the Queue
 		while (!READ_FIFO_EMPTY) {
 			unsigned int data = FIFO_READ;
-			printf("Read word=0x%x, inport_accept_o=%d, outport_valid_o=%d, idle_o=%d, count_zero=%d, empty=%d, word_count=%d\n", data,
-				(data>>0)&1, (data>>1)&1, (data>>2)&1, (data>>3)&1,
-				0xFF & (data >> 16), 0xFF & (data >> 24));
+			print_data(data);
 		}
 	}
 

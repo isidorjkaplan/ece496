@@ -68,12 +68,12 @@ module img_preproc_top(
     // JPEG declaration
 
     jpeg_core jpeg( 
-        .clk_i(clock), .rst_i(reset),
-        .inport_valid_i(in_valid && (word_count != 0)), //valid unless we are waiting to start something new
+        .clk_i(clock), .rst_i(reset || (in_valid && word_count==0 && in_data==0)),
+        .inport_valid_i(in_valid && (word_count != 0)), //if we put 1'b1 than inport_accept goes high
         .inport_data_i(in_data),
         .inport_strb_i(4'hf), //all bytes are valid (for now)
         .inport_last_i(word_count==1 && in_valid), //last cycle of valid data  
-        .outport_accept_i(~downstream_stall), //can accept when not stalling downstream
+        .outport_accept_i(!downstream_stall && outport_valid_o), //ack when not stalling and we have valid outport
 
         // For now putting this here since we do logic with it seperately
         .inport_accept_o(inport_accept_o),
@@ -88,7 +88,9 @@ module img_preproc_top(
         .idle_o(idle_o));
 
     // JPEG CORE ASSIGNMENTS
-    assign upstream_stall = (word_count==0)? 1'b0 : (~inport_accept_o); // Can always latch word size, must wait for rest
+    // bug in this, it was glitching, when we set to zero it works but misses some reads.
+    // WARNING: misunderstood inport_accept_o/outport_accept_o, they are handshake signals!!! 
+    assign upstream_stall = (word_count==0) ? 1'b0 : !inport_accept_o; // Can always latch word size, must wait for rest
 
     // OUTPUT HACK
 
@@ -101,6 +103,6 @@ module img_preproc_top(
     assign out_data[4] = ^{outport_width_o, outport_height_o, outport_pixel_x_o, outport_pixel_y_o, outport_pixel_r_o, outport_pixel_g_o, outport_pixel_b_o};
  
     // For now
-    assign out_valid = outport_valid_o || timeout;
+    assign out_valid = outport_valid_o || timeout || inport_accept_o;
 
 endmodule 
