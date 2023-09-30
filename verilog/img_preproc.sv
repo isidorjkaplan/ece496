@@ -48,8 +48,8 @@ module img_preproc_top(
 
     // TIMEOUT LOGIC
     // TODO; this is not gonna be in final thing
-    
-    parameter TIMEOUT_CYCLES = 32'h2FAF080; // 50 MILLION cycles = 1 second
+    /*
+    parameter TIMEOUT_CYCLES = 1024; //32'h2FAF080; // 50 MILLION cycles = 1 second
     logic [31 : 0 ] timeout_count;
     logic timeout;
     assign timeout = (timeout_count==0);
@@ -65,6 +65,7 @@ module img_preproc_top(
             timeout_count <= TIMEOUT_CYCLES;
         end
     end
+    */
 
     // JPEG declaration
 
@@ -73,10 +74,11 @@ module img_preproc_top(
         inport_strb_i = 4'b1111;
         // if we are at the end of the file may only be partially valid (with MSB invalid)
         if (byte_count < 4) begin
-            case(byte_count) 
+            case(byte_count[1:0]) 
             1: inport_strb_i = 4'b0001;
             2: inport_strb_i = 4'b0011;
             3: inport_strb_i = 4'b0111;
+            default: inport_strb_i = 4'b1111;
             endcase
         end
     end
@@ -108,5 +110,4 @@ module img_preproc_top(
 
     assign out_data = {outport_pixel_x_o, outport_pixel_y_o};
     assign out_valid = outport_valid_o;
-
 endmodule 

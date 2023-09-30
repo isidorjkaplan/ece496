@@ -95,9 +95,10 @@ double elapsedTime;
 #define MIN(x, y) ((x<=y)?x:y)
 
 void print_data(unsigned int data) {
-	printf("Read word=0x%x, inport_accept_o=%d, outport_width_o_nonzero=%d, idle_o=%d, count_zero=%d, jpeg_debug_tap=%d, word_count=%d\n", data,
+	/*printf("Read word=0x%x, inport_accept_o=%d, outport_width_o_nonzero=%d, idle_o=%d, count_zero=%d, jpeg_debug_tap=%d, word_count=%d\n", data,
 				(data>>0)&1, (data>>1)&1, (data>>2)&1, (data>>3)&1,
-				0xFF & (data >> 16), 0xFF & (data >> 24));
+				0xFF & (data >> 16), 0xFF & (data >> 24));*/
+	printf("Read data word=0x%x\n", data);
 }
 
 void read_next() { 
@@ -158,6 +159,7 @@ int main (int argc, char *argv[])
 		i++;
 	}
 
+	int read_count = 0;
 	//============================================
 	printf("sudo ./command <file.ppm>\n");
 	if (argc == 2) {
@@ -178,6 +180,8 @@ int main (int argc, char *argv[])
 
 		printf("File is %d words (4 bytes/word)\n", size);
 		
+		
+
 		i = 0;
 		//reset the device
 		FIFO_WRITE_BLOCK(0);
@@ -186,14 +190,18 @@ int main (int argc, char *argv[])
 		//send the words
 		while(!feof(f) && i < size)
 		{
-			unsigned int word;
+			unsigned int word = 0;
 			//cannot do more then 4 bytes at a time
 			unsigned int bytes = MIN(size-i, 4); 
 			fread(&word, 1, bytes,f);
 			FIFO_WRITE_BLOCK(word);
+			printf("Writing word  =0x%x\n", word);
 			i+=bytes;
-			read_next();
-			//if (size-i == 20) break;
+			while (!READ_FIFO_EMPTY) {
+				//print_data(FIFO_READ);
+				FIFO_READ;
+				read_count++;
+			}
 		}
 		printf("Wrote %d of %d bytes from file.\n", i, size);
 		fclose(f);
@@ -201,16 +209,17 @@ int main (int argc, char *argv[])
 	}
 
 	i = 0;
-	while (i < 100*30) {
+	while (i < 100*10) {
 		// give the FPGA time to finish working
 		usleep(10000);  
 		// Flush any initial contents on the Queue
 		while (!READ_FIFO_EMPTY) {
 			FIFO_READ;
-			print_data(FIFO_READ);
+			read_count++;
 		}
 		i++;
 	}
+	printf("Read total of %d words\n", read_count);
 
 	printf("Program Done\n");
 	exit(0);
