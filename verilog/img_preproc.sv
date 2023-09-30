@@ -100,7 +100,6 @@ module img_preproc_top(
         .outport_pixel_r_o(outport_pixel_r_o),
         .outport_pixel_g_o(outport_pixel_g_o),
         .outport_pixel_b_o(outport_pixel_b_o),
-        .outport_debug_tap_o(outport_debug_tap_o),
         .idle_o(idle_o));
 
     // JPEG CORE ASSIGNMENTS
@@ -108,18 +107,7 @@ module img_preproc_top(
     // WARNING: misunderstood inport_accept_o/outport_accept_o, they are handshake signals!!! 
     assign upstream_stall = (byte_count==0) ? 1'b0 : !inport_accept_o; // Can always latch word size, must wait for rest
 
-    // OUTPUT HACK
-
-    assign out_data[31:24] = byte_count;
-    assign out_data[23:16] = outport_debug_tap_o;
-    assign out_data[0] = inport_accept_o;
-    assign out_data[1] = outport_width_o != 0;
-    assign out_data[2] = idle_o;
-    assign out_data[3] = timeout;
-    // Ensure it does not get optimized away
-    assign out_data[4] = ^{outport_width_o, outport_height_o, outport_pixel_x_o, outport_pixel_y_o, outport_pixel_r_o, outport_pixel_g_o, outport_pixel_b_o};
- 
-    // For now
-    assign out_valid = outport_valid_o || timeout || inport_accept_o;
+    assign out_data = 0;
+    assign out_valid = outport_valid_o;
 
 endmodule 

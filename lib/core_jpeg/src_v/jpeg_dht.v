@@ -83,6 +83,10 @@ begin
     reg [15:0] cx_ac_min_code_q[0:15];
     reg [15:0] cx_ac_max_code_q[0:15];
     reg [9:0]  cx_ac_ptr_q[0:15];
+    
+    // Moved - Isidor
+    reg [11:0] total_entries_q;
+    reg [11:0] idx_q;
 
     // DHT tables can be combined into one section...
     // Reset the table state machine at the end of each table
@@ -91,7 +95,7 @@ begin
     //-----------------------------------------------------------------
     // Capture Index
     //-----------------------------------------------------------------
-    reg [11:0] idx_q;
+
 
     always @ (posedge clk_i )
     if (rst_i)
@@ -117,7 +121,7 @@ begin
     //-----------------------------------------------------------------
     reg [7:0]  num_entries_q[0:15];
     reg [15:0] has_entries_q; // bitmap
-    reg [11:0] total_entries_q;
+
 
     always @ (posedge clk_i )
     if (rst_i)
