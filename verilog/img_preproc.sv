@@ -46,27 +46,6 @@ module img_preproc_top(
         end
     end
 
-    // TIMEOUT LOGIC
-    // TODO; this is not gonna be in final thing
-    /*
-    parameter TIMEOUT_CYCLES = 1024; //32'h2FAF080; // 50 MILLION cycles = 1 second
-    logic [31 : 0 ] timeout_count;
-    logic timeout;
-    assign timeout = (timeout_count==0);
-    always_ff @ (posedge clock) begin
-        if (reset) begin
-            timeout_count <= 0;
-        end
-        else if (timeout_count != 0) begin
-            timeout_count <= (timeout_count - 1);
-        end
-        //TODO; also must only do this when we initially set byte_count
-        else if (timeout_count == 0) begin
-            timeout_count <= TIMEOUT_CYCLES;
-        end
-    end
-    */
-
     // JPEG declaration
 
     always_comb begin
@@ -108,6 +87,6 @@ module img_preproc_top(
     // WARNING: misunderstood inport_accept_o/outport_accept_o, they are handshake signals!!! 
     assign upstream_stall = (byte_count==0) ? 1'b0 : !inport_accept_o; // Can always latch word size, must wait for rest
 
-    assign out_data = {outport_pixel_x_o, outport_pixel_y_o};
-    assign out_valid = outport_valid_o;
+    assign out_data = in_valid?in_data:{outport_pixel_x_o, outport_pixel_y_o};
+    assign out_valid = outport_valid_o || in_valid;
 endmodule 

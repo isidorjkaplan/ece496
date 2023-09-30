@@ -199,7 +199,7 @@ int main (int argc, char *argv[])
 			i+=bytes;
 			while (!READ_FIFO_EMPTY) {
 				//print_data(FIFO_READ);
-				FIFO_READ;
+				print_data(FIFO_READ);
 				read_count++;
 			}
 		}
@@ -214,7 +214,7 @@ int main (int argc, char *argv[])
 		usleep(10000);  
 		// Flush any initial contents on the Queue
 		while (!READ_FIFO_EMPTY) {
-			FIFO_READ;
+			print_data(FIFO_READ);
 			read_count++;
 		}
 		i++;
