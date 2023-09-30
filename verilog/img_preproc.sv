@@ -24,7 +24,6 @@ module img_preproc_top(
     logic [  7:0]  outport_pixel_r_o;
     logic [  7:0]  outport_pixel_g_o;
     logic [  7:0]  outport_pixel_b_o ; 
-    logic [ 15:0]  outport_debug_tap_o;
     logic outport_valid_o;
     logic idle_o;
     logic inport_accept_o;
@@ -107,7 +106,7 @@ module img_preproc_top(
     // WARNING: misunderstood inport_accept_o/outport_accept_o, they are handshake signals!!! 
     assign upstream_stall = (byte_count==0) ? 1'b0 : !inport_accept_o; // Can always latch word size, must wait for rest
 
-    assign out_data = 0;
+    assign out_data = {outport_pixel_x_o, outport_pixel_y_o};
     assign out_valid = outport_valid_o;
 
 endmodule 

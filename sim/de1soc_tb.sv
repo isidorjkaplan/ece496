@@ -49,9 +49,6 @@ module de1soc_tb();
 
     logic downstream_stall;
     logic upstream_stall;
-
-    assign downstream_stall = 0; //testbench can always read
-
     img_preproc_top dut(.clock(clock), .reset(reset), 
 	// Inputs
 	.in_data(in_data), .in_valid(in_valid),
@@ -67,6 +64,7 @@ module de1soc_tb();
         #1
         while (upstream_stall) begin
             @(posedge clock);
+            #1;
             //$display("Stalling while writing: %x", value);
         end
         //$assert(!upstream_stall && in_valid);
@@ -76,14 +74,42 @@ module de1soc_tb();
         end
         @(posedge clock);
         in_valid = 0;
+        @(posedge clock);
+        @(posedge clock);
     end
     endtask
 
     task automatic write_image(int N, input [7:0] bytes[]);
     begin
+        write_value(0);
         write_value(N);
         for (int i = 0; i < N; i+=4) begin
             write_value({bytes[i+3], bytes[i+2], bytes[i+1], bytes[i]});
+        end
+    end
+    endtask
+
+    task automatic read_next_value();
+    begin
+        // Ready to read
+        downstream_stall = 0;
+        #1;
+        while (!out_valid) begin
+            @(posedge clock);
+            #1;
+        end
+        $display("Reading 32'h%x", out_data);
+        @(posedge clock);
+        downstream_stall = 1;
+        @(posedge clock);
+        @(posedge clock);
+    end
+    endtask
+
+    task automatic read_values(int N);
+    begin
+        for (int i = 0; i < N; i++) begin
+            read_next_value();
         end
     end
     endtask
@@ -93,6 +119,7 @@ module de1soc_tb();
 
     initial begin
         clk_reset = 1;
+        downstream_stall = 1;
         reset = 1;
         in_valid = 0;
         #6
@@ -104,10 +131,8 @@ module de1soc_tb();
         //    write_value(i);
         //end
         write_image(img_size, img_file);
-        // Wait for result
-        for (int i = 0; i < 1000; i++) begin
-            @(posedge clock);
-        end
+        
+        read_values(100);
         $stop();
     end
 endmodule 

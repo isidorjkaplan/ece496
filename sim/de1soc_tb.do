@@ -6,5 +6,4 @@ vsim de1soc_tb
 
 log *
 add wave dut/*
-
 run -all
