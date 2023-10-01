@@ -149,21 +149,24 @@ int main (int argc, char *argv[])
 	usleep(30000);  
 	// Flush any initial contents on the Queue
 	
-	/*int i = 0;
+	int i = 0;
 	while (!READ_FIFO_EMPTY) {
-		print_data(FIFO_READ);
+		FIFO_READ;
 		if (i > 1000) {
 			printf("Failed to flush FIFO queue!\n");
 			break;
 		}
 		i++;
-	}*/
+	}
+	printf("Flushed FIFO read queue");
+
+
+	//============================================
+	printf("Usage: sudo ./command <file>\n");
 
 	int read_count = 0;
-	//============================================
-	//printf("sudo ./command <file|'skip'> <out_select> <out_cond_bitmask>\n");
-	//assert(argc >= 4);
-	/*if (strcmp(argv[1],"skip") != 0) {
+
+	if (argc == 2) {
 		printf("Opening file %s\n", argv[1]);
 		FILE* f = fopen(argv[1], "rb");
 		
@@ -181,15 +184,9 @@ int main (int argc, char *argv[])
 
 		printf("File is %d words (4 bytes/word)\n", size);
 		
-		unsigned char output_select = atoi(argv[2]);
-		unsigned int output_bitmask = 1<<atoi(argv[3]);
-		unsigned int conf_reg = (output_bitmask << 8) | output_select;
-		printf("Obtained out_select=%d, bitmask=%d -> conf_reg = %d", output_select, output_bitmask);
-
 		i = 0;
-		FIFO_WRITE_BLOCK(conf_reg);
 		//reset the device
-		FIFO_WRITE_BLOCK(0);
+		//FIFO_WRITE_BLOCK(0);
 		//tell it how many words we will send
 		FIFO_WRITE_BLOCK(size);
 		//send the words
@@ -211,11 +208,10 @@ int main (int argc, char *argv[])
 		printf("Wrote %d of %d bytes from file.\n", i, size);
 		fclose(f);
 
-	}*/
+	}
 
 	// Send reset signal
-	FIFO_WRITE_BLOCK(0);
-	int i = 0;
+	i = 0;
 	while (i < 100*30) {
 		// give the FPGA time to finish working
 		usleep(10000);  

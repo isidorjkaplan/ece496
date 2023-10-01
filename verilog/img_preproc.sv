@@ -11,7 +11,7 @@ module img_preproc_top(
     output reg out_valid, 
 
     input wire downstream_stall,
-    output wire upstream_stall,
+    output wire upstream_stall
 
 );  
 
