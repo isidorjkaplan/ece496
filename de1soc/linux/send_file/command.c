@@ -98,7 +98,7 @@ void print_data(unsigned int data) {
 	/*printf("Read word=0x%x, inport_accept_o=%d, outport_width_o_nonzero=%d, idle_o=%d, count_zero=%d, jpeg_debug_tap=%d, word_count=%d\n", data,
 				(data>>0)&1, (data>>1)&1, (data>>2)&1, (data>>3)&1,
 				0xFF & (data >> 16), 0xFF & (data >> 24));*/
-	printf("Read data word=0x%x\n", data);
+	printf("Read data word= 0x%x = 32'd%d\n", data, data);
 }
 
 void read_next() { 
@@ -161,8 +161,9 @@ int main (int argc, char *argv[])
 
 	int read_count = 0;
 	//============================================
-	printf("sudo ./command <file.ppm>\n");
-	if (argc == 2) {
+	printf("sudo ./command <file|'skip'> <out_select> <out_cond_bitmask>\n");
+	assert(argc >= 4);
+	if (argv[1] != "skip") {
 		printf("Opening file %s\n", argv[1]);
 		FILE* f = fopen(argv[1], "rb");
 		
@@ -180,9 +181,13 @@ int main (int argc, char *argv[])
 
 		printf("File is %d words (4 bytes/word)\n", size);
 		
-		
+		unsigned char output_select = atoi(argv[2]);
+		unsigned int output_bitmask = 1<<atoi(argv[3]);
+		unsigned int conf_reg = (output_bitmask << 8) | output_select;
+		printf("Obtained out_select=%d, bitmask=%d -> conf_reg = %d", output_select, output_bitmask);
 
 		i = 0;
+		FIFO_WRITE_BLOCK(conf_reg);
 		//reset the device
 		FIFO_WRITE_BLOCK(0);
 		//tell it how many words we will send

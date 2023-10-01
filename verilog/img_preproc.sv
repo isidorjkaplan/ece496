@@ -11,7 +11,10 @@ module img_preproc_top(
     output reg out_valid, 
 
     input wire downstream_stall,
-    output wire upstream_stall
+    output wire upstream_stall,
+
+    output logic [31 : 0] debug_signals[31:0],
+    output logic [23 : 0] debug_conditions
 );  
 
     //JPEG CORE PORTS
@@ -80,13 +83,44 @@ module img_preproc_top(
         .outport_pixel_r_o(outport_pixel_r_o),
         .outport_pixel_g_o(outport_pixel_g_o),
         .outport_pixel_b_o(outport_pixel_b_o),
-        .idle_o(idle_o));
+        .idle_o(idle_o),
+        
+        .debug_signals(debug_signals[31:12]),
+        .debug_conditions(debug_conditions[23:5])
+        );
+
+
 
     // JPEG CORE ASSIGNMENTS
     // bug in this, it was glitching, when we set to zero it works but misses some reads.
     // WARNING: misunderstood inport_accept_o/outport_accept_o, they are handshake signals!!! 
     assign upstream_stall = (byte_count==0) ? 1'b0 : !inport_accept_o; // Can always latch word size, must wait for rest
 
-    assign out_data = in_valid?in_data:{outport_pixel_x_o, outport_pixel_y_o};
-    assign out_valid = outport_valid_o || in_valid;
+    assign out_data = 0;
+    assign out_valid = outport_valid_o;
+
+    // DEBUG TAPS
+
+    assign debug_signals[1] = byte_count;
+    assign debug_signals[2] = inport_strb_i;
+    assign debug_signals[3] = outport_height_o;
+    assign debug_signals[4] = outport_width_o;
+    assign debug_signals[5] = outport_pixel_x_o;
+    assign debug_signals[6] = outport_pixel_y_o;
+    assign debug_signals[7] = outport_pixel_r_o;
+    assign debug_signals[8] = outport_pixel_g_o;
+    assign debug_signals[9] = outport_pixel_b_o;
+    assign debug_signals[10] = {idle_o, 3'b0, outport_valid_o, 3'b0, inport_accept_o};
+    assign debug_signals[11] = {upstream_stall, 3'b0, downstream_stall};
+
+
+    // DEBUG CONDITIONS
+    assign debug_conditions[0] = outport_valid_o;
+    assign debug_conditions[1] = inport_accept_o;
+    assign debug_conditions[2] = idle_o;
+    assign debug_conditions[3] = downstream_stall;
+    assign debug_conditions[4] = upstream_stall;
+
+    
+
 endmodule 
