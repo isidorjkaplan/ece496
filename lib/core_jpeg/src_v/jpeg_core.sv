@@ -147,22 +147,8 @@ u_jpeg_input
     ,.data_data_o(bb_inport_data_w)
     ,.data_last_o(bb_inport_last_w)
 
-    ,.debug_signals(debug_signals[6:0])
-    ,.debug_conditions(debug_conditions[10:0])
 );
 
-assign debug_signals[20] = {inport_valid_i, inport_last_i, dht_cfg_accept_w, dqt_cfg_accept_w, inport_accept_o};
-assign debug_signals[19] = {img_start_w, img_end_w};
-assign debug_signals[18] = {img_width_w};
-assign debug_signals[17] = {img_height_w};
-assign debug_signals[16] = {img_mode_w};
-assign debug_signals[15] = {bb_inport_valid_w, bb_inport_last_w, bb_inport_accept_w};
-
-assign debug_conditions[18] = bb_inport_valid_w;
-assign debug_conditions[17] = bb_inport_accept_w;
-assign debug_conditions[16] = bb_inport_last_w;
-assign debug_conditions[15] = img_start_w;
-assign debug_conditions[14] = img_end_w;
 
 
 
@@ -276,15 +262,6 @@ u_jpeg_output
     ,.idle_o(idle_o)
 );
 
-assign debug_signals[14] = {output_inport_valid_w, output_inport_accept_w};
-assign debug_signals[13] = {output_inport_idx_w, output_inport_id_w};
-assign debug_signals[12] = output_outport_data_w;
-
-assign debug_conditions[13] = output_inport_accept_w;
-assign debug_conditions[12] = output_inport_valid_w;
-assign debug_conditions[11] = outport_accept_i;
-
-
 jpeg_bitbuffer
 u_jpeg_bitbuffer
 (
@@ -336,12 +313,6 @@ u_jpeg_mcu_proc
     ,.outport_id_o(dqt_inport_id_w)
     ,.outport_eob_o(dqt_inport_eob_w)
 );
-
-assign debug_signals[10] = {bb_outport_valid_w, bb_outport_last_w, lookup_valid_w};
-assign debug_signals[9] = bb_outport_data_w;
-assign debug_signals[8] = lookup_width_w;
-assign debug_signals[7] = lookup_value_w;
-
 
 
 endmodule

@@ -61,9 +61,6 @@ module jpeg_input
     ,output          data_valid_o
     ,output [  7:0]  data_data_o
     ,output          data_last_o
-
-    ,output [31 : 0] debug_signals[6:0]
-    ,output [10 : 0] debug_conditions
 );
 
 
@@ -570,10 +567,5 @@ else if (state_q == STATE_IDLE && token_soi_w)
 assign img_start_o = start_q;
 assign img_end_o   = eof_q | (inport_valid_i & token_eoi_w);
 assign img_mode_o  = img_mode_q;
-
-
-assign debug_signals[6] = {byte_idx_q ,last_b_q, data_r};
-assign debug_signals[5] = state_q;
-
 
 endmodule

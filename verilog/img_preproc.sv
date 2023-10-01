@@ -13,8 +13,6 @@ module img_preproc_top(
     input wire downstream_stall,
     output wire upstream_stall,
 
-    output logic [31 : 0] debug_signals[31:0],
-    output logic [23 : 0] debug_conditions
 );  
 
     //JPEG CORE PORTS
@@ -84,9 +82,6 @@ module img_preproc_top(
         .outport_pixel_g_o(outport_pixel_g_o),
         .outport_pixel_b_o(outport_pixel_b_o),
         .idle_o(idle_o),
-        
-        .debug_signals(debug_signals[20:0]),
-        .debug_conditions(debug_conditions[18:0])
         );
 
 
@@ -98,29 +93,5 @@ module img_preproc_top(
 
     assign out_data = {outport_pixel_x_o, outport_pixel_y_o};
     assign out_valid = outport_valid_o;
-
-    // DEBUG TAPS
-
-    assign debug_signals[31] = byte_count;
-    assign debug_signals[30] = inport_strb_i;
-    assign debug_signals[29] = outport_height_o;
-    assign debug_signals[28] = outport_width_o;
-    assign debug_signals[27] = outport_pixel_x_o;
-    assign debug_signals[26] = outport_pixel_y_o;
-    assign debug_signals[25] = outport_pixel_r_o;
-    assign debug_signals[24] = outport_pixel_g_o;
-    assign debug_signals[23] = outport_pixel_b_o;
-    assign debug_signals[22] = {idle_o, 3'b0, outport_valid_o, 3'b0, inport_accept_o};
-    assign debug_signals[21] = {upstream_stall, 3'b0, downstream_stall};
-
-
-    // DEBUG CONDITIONS
-    assign debug_conditions[23] = outport_valid_o;
-    assign debug_conditions[22] = inport_accept_o;
-    assign debug_conditions[21] = idle_o;
-    assign debug_conditions[20] = downstream_stall;
-    assign debug_conditions[19] = upstream_stall;
-
-    
 
 endmodule 

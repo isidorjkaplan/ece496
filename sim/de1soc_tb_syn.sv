@@ -51,8 +51,6 @@ module de1soc_tb_syn(
         end
     end
 
-    logic [31 : 0] debug_signals[31:0];
-    logic [23 : 0] debug_conditions;
 
     img_preproc_top dut(.clock(clock), .reset(reset), 
 	// Inputs
@@ -61,8 +59,7 @@ module de1soc_tb_syn(
 	// Outputs
 	.out_data(out_data), .out_valid(out_valid), 
 	// Control Flow
-	.downstream_stall(downstream_stall), .upstream_stall(upstream_stall),
-    .debug_signals(debug_signals), .debug_conditions(debug_conditions));
+	.downstream_stall(downstream_stall), .upstream_stall(upstream_stall));
 
 endmodule 
 
