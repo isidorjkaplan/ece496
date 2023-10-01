@@ -1,0 +1,16 @@
+# vsim . 
+# Start time: 16:50:10 on Oct 01,2023
+# ** Error (suppressible): (vsim-19) Failed to access library '' at "".
+# No such file or directory. (errno = ENOENT)
+# Error loading design
+# End time: 16:50:10 on Oct 01,2023, Elapsed time: 0:00:00
+# Errors: 1, Warnings: 0
+
+ls
+# de1soc_tb.do
+# de1soc_tb.sv
+# de1soc_tb_syn.sv
+# jpeg_extract.py
+# transcript
+# vsim.wlf
+# work
