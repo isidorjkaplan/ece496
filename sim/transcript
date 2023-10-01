@@ -2603,3 +2603,883 @@ do de1soc_tb.do
 # ** Note: $stop    : de1soc_tb.sv(46)
 #    Time: 100001 ns  Iteration: 0  Instance: /de1soc_tb
 # Break in Module de1soc_tb at de1soc_tb.sv line 46
+do de1soc_tb.do
+# Model Technology ModelSim - Intel FPGA Edition vlog 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 18:58:16 on Oct 01,2023
+# vlog -reportprogress 300 ../verilog/de1soc_top.sv ../verilog/img_model.sv ../verilog/img_preproc.sv 
+# -- Compiling module de1soc_top
+# -- Compiling module img_model_top
+# -- Compiling module img_preproc_top
+# 
+# Top level modules:
+# 	de1soc_top
+# 	img_model_top
+# End time: 18:58:16 on Oct 01,2023, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vlog 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 18:58:16 on Oct 01,2023
+# vlog -reportprogress 300 ../lib/core_jpeg/src_v/jpeg_bitbuffer.v ../lib/core_jpeg/src_v/jpeg_dht.v ../lib/core_jpeg/src_v/jpeg_dht_std_cx_ac.v ../lib/core_jpeg/src_v/jpeg_dht_std_cx_dc.v ../lib/core_jpeg/src_v/jpeg_dht_std_y_ac.v ../lib/core_jpeg/src_v/jpeg_dht_std_y_dc.v ../lib/core_jpeg/src_v/jpeg_dqt.v ../lib/core_jpeg/src_v/jpeg_idct.v ../lib/core_jpeg/src_v/jpeg_idct_fifo.v ../lib/core_jpeg/src_v/jpeg_idct_ram.v ../lib/core_jpeg/src_v/jpeg_idct_ram_dp.v ../lib/core_jpeg/src_v/jpeg_idct_transpose.v ../lib/core_jpeg/src_v/jpeg_idct_transpose_ram.v ../lib/core_jpeg/src_v/jpeg_idct_x.v ../lib/core_jpeg/src_v/jpeg_idct_y.v ../lib/core_jpeg/src_v/jpeg_mcu_id.v ../lib/core_jpeg/src_v/jpeg_mcu_proc.v ../lib/core_jpeg/src_v/jpeg_output.v ../lib/core_jpeg/src_v/jpeg_output_cx_ram.v ../lib/core_jpeg/src_v/jpeg_output_fifo.v ../lib/core_jpeg/src_v/jpeg_output_y_ram.v 
+# -- Compiling module jpeg_bitbuffer
+# -- Compiling module jpeg_dht
+# -- Compiling module jpeg_dht_std_cx_ac
+# -- Compiling module jpeg_dht_std_cx_dc
+# -- Compiling module jpeg_dht_std_y_ac
+# -- Compiling module jpeg_dht_std_y_dc
+# -- Compiling module jpeg_dqt
+# -- Compiling module jpeg_idct
+# -- Compiling module jpeg_idct_fifo
+# -- Compiling module jpeg_idct_ram
+# -- Compiling module jpeg_idct_ram_dp
+# -- Compiling module jpeg_idct_transpose
+# -- Compiling module jpeg_idct_transpose_ram
+# -- Compiling module jpeg_idct_x
+# -- Compiling module jpeg_idct_y
+# -- Compiling module jpeg_mcu_id
+# -- Compiling module jpeg_mcu_proc
+# -- Compiling module jpeg_output
+# -- Compiling module jpeg_output_cx_ram
+# -- Compiling module jpeg_output_cx_ram_ram_dp_256_8
+# -- Compiling module jpeg_output_fifo
+# -- Compiling module jpeg_output_y_ram
+# -- Compiling module jpeg_output_y_ram_ram_dp_512_9
+# 
+# Top level modules:
+# 	jpeg_bitbuffer
+# 	jpeg_dht
+# 	jpeg_dqt
+# 	jpeg_idct
+# 	jpeg_mcu_proc
+# 	jpeg_output
+# End time: 18:58:16 on Oct 01,2023, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vlog 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 18:58:16 on Oct 01,2023
+# vlog -reportprogress 300 ../lib/core_jpeg/src_v/jpeg_core.sv ../lib/core_jpeg/src_v/jpeg_input.sv 
+# -- Compiling module jpeg_core
+# -- Compiling module jpeg_input
+# 
+# Top level modules:
+# 	jpeg_core
+# End time: 18:58:16 on Oct 01,2023, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vlog 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 18:58:16 on Oct 01,2023
+# vlog -reportprogress 300 de1soc_tb.sv de1soc_tb_syn.sv 
+# -- Compiling module de1soc_tb
+# -- Compiling module de1soc_tb_syn
+# 
+# Top level modules:
+# 	de1soc_tb
+# End time: 18:58:16 on Oct 01,2023, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# End time: 18:58:17 on Oct 01,2023, Elapsed time: 0:18:22
+# Errors: 0, Warnings: 0
+# vsim de1soc_tb 
+# Start time: 18:58:17 on Oct 01,2023
+# Loading sv_std.std
+# Loading work.de1soc_tb
+# Loading work.de1soc_tb_syn
+# Loading work.img_preproc_top
+# Loading work.jpeg_core
+# Loading work.jpeg_input
+# Loading work.jpeg_dht
+# Loading work.jpeg_idct
+# Loading work.jpeg_idct_ram
+# Loading work.jpeg_idct_ram_dp
+# Loading work.jpeg_idct_x
+# Loading work.jpeg_idct_transpose
+# Loading work.jpeg_idct_transpose_ram
+# Loading work.jpeg_idct_y
+# Loading work.jpeg_idct_fifo
+# Loading work.jpeg_dqt
+# Loading work.jpeg_output
+# Loading work.jpeg_output_y_ram
+# Loading work.jpeg_output_y_ram_ram_dp_512_9
+# Loading work.jpeg_output_cx_ram
+# Loading work.jpeg_output_cx_ram_ram_dp_256_8
+# Loading work.jpeg_output_fifo
+# Loading work.jpeg_bitbuffer
+# Loading work.jpeg_mcu_proc
+# Loading work.jpeg_mcu_id
+# Loading work.jpeg_dht_std_y_dc
+# Loading work.jpeg_dht_std_y_ac
+# Loading work.jpeg_dht_std_cx_dc
+# Loading work.jpeg_dht_std_cx_ac
+#           0: Reading 32'h00000000
+#           1: Reading 32'h00010000
+#           2: Reading 32'h00020000
+#           3: Reading 32'h00030000
+#           4: Reading 32'h00040000
+#           5: Reading 32'h00050000
+#           6: Reading 32'h00050000
+#           7: Reading 32'h00050000
+#           8: Reading 32'h00050000
+#           9: Reading 32'h00050000
+#          10: Reading 32'h00050000
+#          11: Reading 32'h00050000
+#          12: Reading 32'h00050000
+#          13: Reading 32'h00050000
+#          14: Reading 32'h00050000
+#          15: Reading 32'h00050000
+#          16: Reading 32'h00050000
+#          17: Reading 32'h00060000
+#          18: Reading 32'h00070000
+#          19: Reading 32'h00000001
+#          20: Reading 32'h00010001
+#          21: Reading 32'h00020001
+#          22: Reading 32'h00030001
+#          23: Reading 32'h00040001
+#          24: Reading 32'h00050001
+#          25: Reading 32'h00060001
+#          26: Reading 32'h00070001
+#          27: Reading 32'h00070001
+#          28: Reading 32'h00070001
+#          29: Reading 32'h00070001
+#          30: Reading 32'h00070001
+#          31: Reading 32'h00070001
+#          32: Reading 32'h00070001
+#          33: Reading 32'h00070001
+#          34: Reading 32'h00070001
+#          35: Reading 32'h00070001
+#          36: Reading 32'h00070001
+#          37: Reading 32'h00070001
+#          38: Reading 32'h00000002
+#          39: Reading 32'h00010002
+#          40: Reading 32'h00020002
+#          41: Reading 32'h00030002
+#          42: Reading 32'h00040002
+#          43: Reading 32'h00050002
+#          44: Reading 32'h00060002
+#          45: Reading 32'h00070002
+#          46: Reading 32'h00000003
+#          47: Reading 32'h00010003
+#          48: Reading 32'h00020003
+#          49: Reading 32'h00020003
+#          50: Reading 32'h00020003
+#          51: Reading 32'h00020003
+#          52: Reading 32'h00020003
+#          53: Reading 32'h00020003
+#          54: Reading 32'h00020003
+#          55: Reading 32'h00020003
+#          56: Reading 32'h00020003
+#          57: Reading 32'h00020003
+#          58: Reading 32'h00030003
+#          59: Reading 32'h00040003
+#          60: Reading 32'h00050003
+#          61: Reading 32'h00060003
+#          62: Reading 32'h00070003
+#          63: Reading 32'h00000004
+#          64: Reading 32'h00010004
+#          65: Reading 32'h00020004
+#          66: Reading 32'h00030004
+#          67: Reading 32'h00040004
+#          68: Reading 32'h00050004
+#          69: Reading 32'h00060004
+#          70: Reading 32'h00060004
+#          71: Reading 32'h00060004
+#          72: Reading 32'h00060004
+#          73: Reading 32'h00060004
+#          74: Reading 32'h00060004
+#          75: Reading 32'h00060004
+#          76: Reading 32'h00060004
+#          77: Reading 32'h00060004
+#          78: Reading 32'h00060004
+#          79: Reading 32'h00060004
+#          80: Reading 32'h00060004
+#          81: Reading 32'h00070004
+#          82: Reading 32'h00000005
+#          83: Reading 32'h00010005
+#          84: Reading 32'h00020005
+#          85: Reading 32'h00030005
+#          86: Reading 32'h00040005
+#          87: Reading 32'h00050005
+#          88: Reading 32'h00060005
+#          89: Reading 32'h00070005
+#          90: Reading 32'h00000006
+#          91: Reading 32'h00000006
+#          92: Reading 32'h00000006
+#          93: Reading 32'h00000006
+#          94: Reading 32'h00000006
+#          95: Reading 32'h00000006
+#          96: Reading 32'h00000006
+#          97: Reading 32'h00000006
+#          98: Reading 32'h00000006
+#          99: Reading 32'h00000006
+#         100: Reading 32'h00000006
+#         101: Reading 32'h00000006
+#         102: Reading 32'h00010006
+#         103: Reading 32'h00020006
+#         104: Reading 32'h00030006
+#         105: Reading 32'h00040006
+#         106: Reading 32'h00050006
+#         107: Reading 32'h00060006
+#         108: Reading 32'h00070006
+#         109: Reading 32'h00000007
+#         110: Reading 32'h00010007
+#         111: Reading 32'h00020007
+#         112: Reading 32'h00030007
+#         113: Reading 32'h00030007
+#         114: Reading 32'h00030007
+#         115: Reading 32'h00030007
+#         116: Reading 32'h00030007
+#         117: Reading 32'h00030007
+#         118: Reading 32'h00030007
+#         119: Reading 32'h00030007
+#         120: Reading 32'h00030007
+#         121: Reading 32'h00030007
+#         122: Reading 32'h00040007
+#         123: Reading 32'h00050007
+#         124: Reading 32'h00060007
+#         125: Reading 32'h00070007
+#         126: Reading 32'h00080000
+#         127: Reading 32'h00090000
+#         128: Reading 32'h000a0000
+#         129: Reading 32'h000b0000
+#         130: Reading 32'h000c0000
+#         131: Reading 32'h000d0000
+#         132: Reading 32'h000e0000
+#         133: Reading 32'h000f0000
+#         134: Reading 32'h000f0000
+#         135: Reading 32'h000f0000
+#         136: Reading 32'h000f0000
+#         137: Reading 32'h000f0000
+#         138: Reading 32'h000f0000
+#         139: Reading 32'h000f0000
+#         140: Reading 32'h000f0000
+#         141: Reading 32'h000f0000
+#         142: Reading 32'h000f0000
+#         143: Reading 32'h000f0000
+#         144: Reading 32'h000f0000
+#         145: Reading 32'h00080001
+#         146: Reading 32'h00090001
+#         147: Reading 32'h000a0001
+#         148: Reading 32'h000b0001
+#         149: Reading 32'h000c0001
+#         150: Reading 32'h000d0001
+#         151: Reading 32'h000e0001
+#         152: Reading 32'h000f0001
+#         153: Reading 32'h00080002
+#         154: Reading 32'h00090002
+#         155: Reading 32'h00090002
+#         156: Reading 32'h00090002
+#         157: Reading 32'h00090002
+#         158: Reading 32'h00090002
+#         159: Reading 32'h00090002
+#         160: Reading 32'h00090002
+#         161: Reading 32'h00090002
+#         162: Reading 32'h00090002
+#         163: Reading 32'h00090002
+#         164: Reading 32'h00090002
+#         165: Reading 32'h00090002
+#         166: Reading 32'h000a0002
+#         167: Reading 32'h000b0002
+#         168: Reading 32'h000c0002
+#         169: Reading 32'h000d0002
+#         170: Reading 32'h000e0002
+#         171: Reading 32'h000f0002
+#         172: Reading 32'h00080003
+#         173: Reading 32'h00090003
+#         174: Reading 32'h000a0003
+#         175: Reading 32'h000b0003
+#         176: Reading 32'h000c0003
+#         177: Reading 32'h000c0003
+#         178: Reading 32'h000c0003
+#         179: Reading 32'h000c0003
+#         180: Reading 32'h000c0003
+#         181: Reading 32'h000c0003
+#         182: Reading 32'h000c0003
+#         183: Reading 32'h000c0003
+#         184: Reading 32'h000c0003
+#         185: Reading 32'h000c0003
+#         186: Reading 32'h000d0003
+#         187: Reading 32'h000e0003
+#         188: Reading 32'h000f0003
+#         189: Reading 32'h00080004
+#         190: Reading 32'h00090004
+#         191: Reading 32'h000a0004
+#         192: Reading 32'h000b0004
+#         193: Reading 32'h000c0004
+#         194: Reading 32'h000d0004
+#         195: Reading 32'h000e0004
+#         196: Reading 32'h000f0004
+#         197: Reading 32'h00080005
+#         198: Reading 32'h00080005
+#         199: Reading 32'h00080005
+#         200: Reading 32'h00080005
+#         201: Reading 32'h00080005
+#         202: Reading 32'h00080005
+#         203: Reading 32'h00080005
+#         204: Reading 32'h00080005
+#         205: Reading 32'h00080005
+#         206: Reading 32'h00080005
+#         207: Reading 32'h00080005
+#         208: Reading 32'h00080005
+#         209: Reading 32'h00090005
+#         210: Reading 32'h000a0005
+#         211: Reading 32'h000b0005
+#         212: Reading 32'h000c0005
+#         213: Reading 32'h000d0005
+#         214: Reading 32'h000e0005
+#         215: Reading 32'h000f0005
+#         216: Reading 32'h00080006
+#         217: Reading 32'h00090006
+#         218: Reading 32'h000a0006
+#         219: Reading 32'h000a0006
+#         220: Reading 32'h000a0006
+#         221: Reading 32'h000a0006
+#         222: Reading 32'h000a0006
+#         223: Reading 32'h000a0006
+#         224: Reading 32'h000a0006
+#         225: Reading 32'h000a0006
+#         226: Reading 32'h000a0006
+#         227: Reading 32'h000a0006
+#         228: Reading 32'h000a0006
+#         229: Reading 32'h000a0006
+#         230: Reading 32'h000b0006
+#         231: Reading 32'h000c0006
+#         232: Reading 32'h000d0006
+#         233: Reading 32'h000e0006
+#         234: Reading 32'h000f0006
+#         235: Reading 32'h00080007
+#         236: Reading 32'h00090007
+#         237: Reading 32'h000a0007
+#         238: Reading 32'h000b0007
+#         239: Reading 32'h000c0007
+#         240: Reading 32'h000d0007
+#         241: Reading 32'h000d0007
+#         242: Reading 32'h000d0007
+#         243: Reading 32'h000d0007
+#         244: Reading 32'h000d0007
+#         245: Reading 32'h000d0007
+#         246: Reading 32'h000d0007
+#         247: Reading 32'h000d0007
+#         248: Reading 32'h000d0007
+#         249: Reading 32'h000d0007
+#         250: Reading 32'h000e0007
+#         251: Reading 32'h000f0007
+#         252: Reading 32'h00100000
+#         253: Reading 32'h00110000
+#         254: Reading 32'h00120000
+#         255: Reading 32'h00130000
+#         256: Reading 32'h00140000
+#         257: Reading 32'h00150000
+#         258: Reading 32'h00160000
+#         259: Reading 32'h00170000
+#         260: Reading 32'h00100001
+#         261: Reading 32'h00110001
+#         262: Reading 32'h00110001
+#         263: Reading 32'h00110001
+#         264: Reading 32'h00110001
+#         265: Reading 32'h00110001
+#         266: Reading 32'h00110001
+#         267: Reading 32'h00110001
+#         268: Reading 32'h00110001
+#         269: Reading 32'h00110001
+#         270: Reading 32'h00110001
+#         271: Reading 32'h00110001
+#         272: Reading 32'h00110001
+#         273: Reading 32'h00120001
+#         274: Reading 32'h00130001
+#         275: Reading 32'h00140001
+#         276: Reading 32'h00150001
+#         277: Reading 32'h00160001
+#         278: Reading 32'h00170001
+#         279: Reading 32'h00100002
+#         280: Reading 32'h00110002
+#         281: Reading 32'h00120002
+#         282: Reading 32'h00130002
+#         283: Reading 32'h00140002
+#         284: Reading 32'h00150002
+#         285: Reading 32'h00160002
+#         286: Reading 32'h00170002
+#         287: Reading 32'h00100003
+#         288: Reading 32'h00110003
+#         289: Reading 32'h00120003
+#         290: Reading 32'h00130003
+#         291: Reading 32'h00140003
+#         292: Reading 32'h00150003
+#         293: Reading 32'h00160003
+#         294: Reading 32'h00170003
+#         295: Reading 32'h00100004
+#         296: Reading 32'h00110004
+#         297: Reading 32'h00120004
+#         298: Reading 32'h00130004
+#         299: Reading 32'h00140004
+#         300: Reading 32'h00150004
+#         301: Reading 32'h00160004
+#         302: Reading 32'h00170004
+#         303: Reading 32'h00100005
+#         304: Reading 32'h00110005
+#         305: Reading 32'h00120005
+#         306: Reading 32'h00130005
+#         307: Reading 32'h00140005
+#         308: Reading 32'h00150005
+#         309: Reading 32'h00160005
+#         310: Reading 32'h00170005
+#         311: Reading 32'h00100006
+#         312: Reading 32'h00110006
+#         313: Reading 32'h00120006
+#         314: Reading 32'h00130006
+#         315: Reading 32'h00140006
+#         316: Reading 32'h00150006
+#         317: Reading 32'h00160006
+#         318: Reading 32'h00170006
+#         319: Reading 32'h00100007
+#         320: Reading 32'h00110007
+#         321: Reading 32'h00120007
+#         322: Reading 32'h00130007
+#         323: Reading 32'h00140007
+#         324: Reading 32'h00150007
+#         325: Reading 32'h00160007
+#         326: Reading 32'h00170007
+#         327: Reading 32'h00180000
+#         328: Reading 32'h00190000
+#         329: Reading 32'h001a0000
+#         330: Reading 32'h001b0000
+#         331: Reading 32'h001c0000
+#         332: Reading 32'h001d0000
+#         333: Reading 32'h001e0000
+#         334: Reading 32'h001f0000
+#         335: Reading 32'h00180001
+#         336: Reading 32'h00190001
+#         337: Reading 32'h001a0001
+#         338: Reading 32'h001b0001
+#         339: Reading 32'h001c0001
+#         340: Reading 32'h001d0001
+#         341: Reading 32'h001e0001
+#         342: Reading 32'h001f0001
+#         343: Reading 32'h00180002
+#         344: Reading 32'h00190002
+#         345: Reading 32'h001a0002
+#         346: Reading 32'h001b0002
+#         347: Reading 32'h001c0002
+#         348: Reading 32'h001d0002
+#         349: Reading 32'h001e0002
+#         350: Reading 32'h001f0002
+#         351: Reading 32'h00180003
+#         352: Reading 32'h00190003
+#         353: Reading 32'h001a0003
+#         354: Reading 32'h001b0003
+#         355: Reading 32'h001c0003
+#         356: Reading 32'h001d0003
+#         357: Reading 32'h001e0003
+#         358: Reading 32'h001f0003
+#         359: Reading 32'h00180004
+#         360: Reading 32'h00190004
+#         361: Reading 32'h001a0004
+#         362: Reading 32'h001b0004
+#         363: Reading 32'h001c0004
+#         364: Reading 32'h001d0004
+#         365: Reading 32'h001e0004
+#         366: Reading 32'h001f0004
+#         367: Reading 32'h00180005
+#         368: Reading 32'h00190005
+#         369: Reading 32'h001a0005
+#         370: Reading 32'h001b0005
+#         371: Reading 32'h001c0005
+#         372: Reading 32'h001d0005
+#         373: Reading 32'h001e0005
+#         374: Reading 32'h001f0005
+#         375: Reading 32'h00180006
+#         376: Reading 32'h00190006
+#         377: Reading 32'h001a0006
+#         378: Reading 32'h001b0006
+#         379: Reading 32'h001c0006
+#         380: Reading 32'h001d0006
+#         381: Reading 32'h001e0006
+#         382: Reading 32'h001f0006
+#         383: Reading 32'h00180007
+#         384: Reading 32'h00190007
+#         385: Reading 32'h001a0007
+#         386: Reading 32'h001b0007
+#         387: Reading 32'h001c0007
+#         388: Reading 32'h001d0007
+#         389: Reading 32'h001e0007
+#         390: Reading 32'h001f0007
+#         391: Reading 32'h00000008
+#         392: Reading 32'h00010008
+#         393: Reading 32'h00020008
+#         394: Reading 32'h00030008
+#         395: Reading 32'h00040008
+#         396: Reading 32'h00050008
+#         397: Reading 32'h00060008
+#         398: Reading 32'h00070008
+#         399: Reading 32'h00000009
+#         400: Reading 32'h00010009
+#         401: Reading 32'h00020009
+#         402: Reading 32'h00030009
+#         403: Reading 32'h00040009
+#         404: Reading 32'h00050009
+#         405: Reading 32'h00060009
+#         406: Reading 32'h00070009
+#         407: Reading 32'h0000000a
+#         408: Reading 32'h0001000a
+#         409: Reading 32'h0002000a
+#         410: Reading 32'h0003000a
+#         411: Reading 32'h0004000a
+#         412: Reading 32'h0005000a
+#         413: Reading 32'h0006000a
+#         414: Reading 32'h0007000a
+#         415: Reading 32'h0000000b
+#         416: Reading 32'h0001000b
+#         417: Reading 32'h0002000b
+#         418: Reading 32'h0003000b
+#         419: Reading 32'h0004000b
+#         420: Reading 32'h0005000b
+#         421: Reading 32'h0006000b
+#         422: Reading 32'h0007000b
+#         423: Reading 32'h0000000c
+#         424: Reading 32'h0001000c
+#         425: Reading 32'h0002000c
+#         426: Reading 32'h0003000c
+#         427: Reading 32'h0004000c
+#         428: Reading 32'h0005000c
+#         429: Reading 32'h0006000c
+#         430: Reading 32'h0007000c
+#         431: Reading 32'h0000000d
+#         432: Reading 32'h0001000d
+#         433: Reading 32'h0002000d
+#         434: Reading 32'h0003000d
+#         435: Reading 32'h0004000d
+#         436: Reading 32'h0005000d
+#         437: Reading 32'h0006000d
+#         438: Reading 32'h0007000d
+#         439: Reading 32'h0000000e
+#         440: Reading 32'h0001000e
+#         441: Reading 32'h0002000e
+#         442: Reading 32'h0003000e
+#         443: Reading 32'h0004000e
+#         444: Reading 32'h0005000e
+#         445: Reading 32'h0006000e
+#         446: Reading 32'h0007000e
+#         447: Reading 32'h0000000f
+#         448: Reading 32'h0001000f
+#         449: Reading 32'h0002000f
+#         450: Reading 32'h0003000f
+#         451: Reading 32'h0004000f
+#         452: Reading 32'h0005000f
+#         453: Reading 32'h0006000f
+#         454: Reading 32'h0007000f
+#         455: Reading 32'h00080008
+#         456: Reading 32'h00090008
+#         457: Reading 32'h000a0008
+#         458: Reading 32'h000b0008
+#         459: Reading 32'h000c0008
+#         460: Reading 32'h000d0008
+#         461: Reading 32'h000e0008
+#         462: Reading 32'h000f0008
+#         463: Reading 32'h00080009
+#         464: Reading 32'h00090009
+#         465: Reading 32'h000a0009
+#         466: Reading 32'h000b0009
+#         467: Reading 32'h000c0009
+#         468: Reading 32'h000d0009
+#         469: Reading 32'h000e0009
+#         470: Reading 32'h000f0009
+#         471: Reading 32'h0008000a
+#         472: Reading 32'h0009000a
+#         473: Reading 32'h000a000a
+#         474: Reading 32'h000b000a
+#         475: Reading 32'h000c000a
+#         476: Reading 32'h000d000a
+#         477: Reading 32'h000e000a
+#         478: Reading 32'h000f000a
+#         479: Reading 32'h0008000b
+#         480: Reading 32'h0009000b
+#         481: Reading 32'h000a000b
+#         482: Reading 32'h000b000b
+#         483: Reading 32'h000c000b
+#         484: Reading 32'h000d000b
+#         485: Reading 32'h000e000b
+#         486: Reading 32'h000f000b
+#         487: Reading 32'h0008000c
+#         488: Reading 32'h0009000c
+#         489: Reading 32'h000a000c
+#         490: Reading 32'h000b000c
+#         491: Reading 32'h000c000c
+#         492: Reading 32'h000d000c
+#         493: Reading 32'h000e000c
+#         494: Reading 32'h000f000c
+#         495: Reading 32'h0008000d
+#         496: Reading 32'h0009000d
+#         497: Reading 32'h000a000d
+#         498: Reading 32'h000b000d
+#         499: Reading 32'h000c000d
+#         500: Reading 32'h000d000d
+#         501: Reading 32'h000e000d
+#         502: Reading 32'h000f000d
+#         503: Reading 32'h0008000e
+#         504: Reading 32'h0009000e
+#         505: Reading 32'h000a000e
+#         506: Reading 32'h000b000e
+#         507: Reading 32'h000c000e
+#         508: Reading 32'h000d000e
+#         509: Reading 32'h000e000e
+#         510: Reading 32'h000f000e
+#         511: Reading 32'h0008000f
+#         512: Reading 32'h0009000f
+#         513: Reading 32'h000a000f
+#         514: Reading 32'h000b000f
+#         515: Reading 32'h000c000f
+#         516: Reading 32'h000d000f
+#         517: Reading 32'h000e000f
+#         518: Reading 32'h000f000f
+#         519: Reading 32'h00100008
+#         520: Reading 32'h00110008
+#         521: Reading 32'h00120008
+#         522: Reading 32'h00130008
+#         523: Reading 32'h00140008
+#         524: Reading 32'h00150008
+#         525: Reading 32'h00160008
+#         526: Reading 32'h00170008
+#         527: Reading 32'h00100009
+#         528: Reading 32'h00110009
+#         529: Reading 32'h00120009
+#         530: Reading 32'h00130009
+#         531: Reading 32'h00140009
+#         532: Reading 32'h00150009
+#         533: Reading 32'h00160009
+#         534: Reading 32'h00170009
+#         535: Reading 32'h0010000a
+#         536: Reading 32'h0011000a
+#         537: Reading 32'h0012000a
+#         538: Reading 32'h0013000a
+#         539: Reading 32'h0014000a
+#         540: Reading 32'h0015000a
+#         541: Reading 32'h0016000a
+#         542: Reading 32'h0017000a
+#         543: Reading 32'h0010000b
+#         544: Reading 32'h0011000b
+#         545: Reading 32'h0012000b
+#         546: Reading 32'h0013000b
+#         547: Reading 32'h0014000b
+#         548: Reading 32'h0015000b
+#         549: Reading 32'h0016000b
+#         550: Reading 32'h0017000b
+#         551: Reading 32'h0010000c
+#         552: Reading 32'h0011000c
+#         553: Reading 32'h0012000c
+#         554: Reading 32'h0013000c
+#         555: Reading 32'h0014000c
+#         556: Reading 32'h0015000c
+#         557: Reading 32'h0016000c
+#         558: Reading 32'h0017000c
+#         559: Reading 32'h0010000d
+#         560: Reading 32'h0011000d
+#         561: Reading 32'h0012000d
+#         562: Reading 32'h0013000d
+#         563: Reading 32'h0014000d
+#         564: Reading 32'h0015000d
+#         565: Reading 32'h0016000d
+#         566: Reading 32'h0017000d
+#         567: Reading 32'h0010000e
+#         568: Reading 32'h0011000e
+#         569: Reading 32'h0012000e
+#         570: Reading 32'h0013000e
+#         571: Reading 32'h0014000e
+#         572: Reading 32'h0015000e
+#         573: Reading 32'h0016000e
+#         574: Reading 32'h0017000e
+#         575: Reading 32'h0010000f
+#         576: Reading 32'h0011000f
+#         577: Reading 32'h0012000f
+#         578: Reading 32'h0013000f
+#         579: Reading 32'h0014000f
+#         580: Reading 32'h0015000f
+#         581: Reading 32'h0016000f
+#         582: Reading 32'h0017000f
+#         583: Reading 32'h00180008
+#         584: Reading 32'h00190008
+#         585: Reading 32'h001a0008
+#         586: Reading 32'h001b0008
+#         587: Reading 32'h001c0008
+#         588: Reading 32'h001d0008
+#         589: Reading 32'h001e0008
+#         590: Reading 32'h001f0008
+#         591: Reading 32'h00180009
+#         592: Reading 32'h00190009
+#         593: Reading 32'h001a0009
+#         594: Reading 32'h001b0009
+#         595: Reading 32'h001c0009
+#         596: Reading 32'h001d0009
+#         597: Reading 32'h001e0009
+#         598: Reading 32'h001f0009
+#         599: Reading 32'h0018000a
+#         600: Reading 32'h0019000a
+#         601: Reading 32'h001a000a
+#         602: Reading 32'h001b000a
+#         603: Reading 32'h001c000a
+#         604: Reading 32'h001d000a
+#         605: Reading 32'h001e000a
+#         606: Reading 32'h001f000a
+#         607: Reading 32'h0018000b
+#         608: Reading 32'h0019000b
+#         609: Reading 32'h001a000b
+#         610: Reading 32'h001b000b
+#         611: Reading 32'h001c000b
+#         612: Reading 32'h001d000b
+#         613: Reading 32'h001e000b
+#         614: Reading 32'h001f000b
+#         615: Reading 32'h0018000c
+#         616: Reading 32'h0019000c
+#         617: Reading 32'h001a000c
+#         618: Reading 32'h001b000c
+#         619: Reading 32'h001c000c
+#         620: Reading 32'h001d000c
+#         621: Reading 32'h001e000c
+#         622: Reading 32'h001f000c
+#         623: Reading 32'h0018000d
+#         624: Reading 32'h0019000d
+#         625: Reading 32'h001a000d
+#         626: Reading 32'h001b000d
+#         627: Reading 32'h001c000d
+#         628: Reading 32'h001d000d
+#         629: Reading 32'h001e000d
+#         630: Reading 32'h001f000d
+#         631: Reading 32'h0018000e
+#         632: Reading 32'h0019000e
+#         633: Reading 32'h001a000e
+#         634: Reading 32'h001b000e
+#         635: Reading 32'h001c000e
+#         636: Reading 32'h001d000e
+#         637: Reading 32'h001e000e
+#         638: Reading 32'h001f000e
+#         639: Reading 32'h0018000f
+#         640: Reading 32'h0019000f
+#         641: Reading 32'h001a000f
+#         642: Reading 32'h001b000f
+#         643: Reading 32'h001c000f
+#         644: Reading 32'h001d000f
+#         645: Reading 32'h001e000f
+#         646: Reading 32'h001f000f
+#         647: Reading 32'h00000010
+#         648: Reading 32'h00010010
+#         649: Reading 32'h00020010
+#         650: Reading 32'h00030010
+#         651: Reading 32'h00040010
+#         652: Reading 32'h00050010
+#         653: Reading 32'h00060010
+#         654: Reading 32'h00070010
+#         655: Reading 32'h00000011
+#         656: Reading 32'h00010011
+#         657: Reading 32'h00020011
+#         658: Reading 32'h00030011
+#         659: Reading 32'h00040011
+#         660: Reading 32'h00050011
+#         661: Reading 32'h00060011
+#         662: Reading 32'h00070011
+#         663: Reading 32'h00000012
+#         664: Reading 32'h00010012
+#         665: Reading 32'h00020012
+#         666: Reading 32'h00030012
+#         667: Reading 32'h00040012
+#         668: Reading 32'h00050012
+#         669: Reading 32'h00060012
+#         670: Reading 32'h00070012
+#         671: Reading 32'h00000013
+#         672: Reading 32'h00010013
+#         673: Reading 32'h00020013
+#         674: Reading 32'h00030013
+#         675: Reading 32'h00040013
+#         676: Reading 32'h00050013
+#         677: Reading 32'h00060013
+#         678: Reading 32'h00070013
+#         679: Reading 32'h00000014
+#         680: Reading 32'h00010014
+#         681: Reading 32'h00020014
+#         682: Reading 32'h00030014
+#         683: Reading 32'h00040014
+#         684: Reading 32'h00050014
+#         685: Reading 32'h00060014
+#         686: Reading 32'h00070014
+#         687: Reading 32'h00000015
+#         688: Reading 32'h00010015
+#         689: Reading 32'h00020015
+#         690: Reading 32'h00030015
+#         691: Reading 32'h00040015
+#         692: Reading 32'h00050015
+#         693: Reading 32'h00060015
+#         694: Reading 32'h00070015
+#         695: Reading 32'h00000016
+#         696: Reading 32'h00010016
+#         697: Reading 32'h00020016
+#         698: Reading 32'h00030016
+#         699: Reading 32'h00040016
+#         700: Reading 32'h00050016
+#         701: Reading 32'h00060016
+#         702: Reading 32'h00070016
+#         703: Reading 32'h00000017
+#         704: Reading 32'h00010017
+#         705: Reading 32'h00020017
+#         706: Reading 32'h00030017
+#         707: Reading 32'h00040017
+#         708: Reading 32'h00050017
+#         709: Reading 32'h00060017
+#         710: Reading 32'h00070017
+#         711: Reading 32'h00080010
+#         712: Reading 32'h00090010
+#         713: Reading 32'h000a0010
+#         714: Reading 32'h000b0010
+#         715: Reading 32'h000c0010
+#         716: Reading 32'h000d0010
+#         717: Reading 32'h000e0010
+#         718: Reading 32'h000f0010
+#         719: Reading 32'h00080011
+#         720: Reading 32'h00090011
+#         721: Reading 32'h000a0011
+#         722: Reading 32'h000b0011
+#         723: Reading 32'h000c0011
+#         724: Reading 32'h000d0011
+#         725: Reading 32'h000e0011
+#         726: Reading 32'h000f0011
+#         727: Reading 32'h00080012
+#         728: Reading 32'h00090012
+#         729: Reading 32'h000a0012
+#         730: Reading 32'h000b0012
+#         731: Reading 32'h000c0012
+#         732: Reading 32'h000d0012
+#         733: Reading 32'h000e0012
+#         734: Reading 32'h000f0012
+#         735: Reading 32'h00080013
+#         736: Reading 32'h00090013
+#         737: Reading 32'h000a0013
+#         738: Reading 32'h000b0013
+#         739: Reading 32'h000c0013
+#         740: Reading 32'h000d0013
+#         741: Reading 32'h000e0013
+#         742: Reading 32'h000f0013
+#         743: Reading 32'h00080014
+#         744: Reading 32'h00090014
+#         745: Reading 32'h000a0014
+#         746: Reading 32'h000b0014
+#         747: Reading 32'h000c0014
+#         748: Reading 32'h000d0014
+#         749: Reading 32'h000e0014
+#         750: Reading 32'h000f0014
+#         751: Reading 32'h00080015
+#         752: Reading 32'h00090015
+#         753: Reading 32'h000a0015
+#         754: Reading 32'h000b0015
+#         755: Reading 32'h000c0015
+#         756: Reading 32'h000d0015
+#         757: Reading 32'h000e0015
+#         758: Reading 32'h000f0015
+#         759: Reading 32'h00080016
+#         760: Reading 32'h00090016
+#         761: Reading 32'h000a0016
+#         762: Reading 32'h000b0016
+#         763: Reading 32'h000c0016
+#         764: Reading 32'h000d0016
+#         765: Reading 32'h000e0016
+#         766: Reading 32'h000f0016
+#         767: Reading 32'h00080017
+#         768: Reading 32'h00090017
+#         769: Reading 32'h000a0017
+#         770: Reading 32'h000b0017
+#         771: Reading 32'h000c0017
+#         772: Reading 32'h000d0017
+#         773: Reading 32'h000e0017
+#         774: Reading 32'h000f0017
+# ** Note: $stop    : de1soc_tb.sv(46)
+#    Time: 100001 ns  Iteration: 0  Instance: /de1soc_tb
+# Break in Module de1soc_tb at de1soc_tb.sv line 46

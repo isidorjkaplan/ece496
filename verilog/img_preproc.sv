@@ -64,7 +64,7 @@ module img_preproc_top(
     end
 
     jpeg_core jpeg( 
-        .clk_i(clock), .rst_i(reset || (in_valid && byte_count==0 && in_data==0)),
+        .clk_i(clock && (in_valid || byte_count==0)), .rst_i(reset || (in_valid && byte_count==0 && in_data==0)),
         .inport_valid_i(in_valid && (byte_count != 0)), //if we put 1'b1 than inport_accept goes high
         .inport_data_i(in_data),
         .inport_strb_i(inport_strb_i), //all bytes are valid (for now)
