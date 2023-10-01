@@ -6,7 +6,7 @@ module de1soc_tb_syn(
     input downstream_stall
 );
     int img_size = 470;
-    logic [7:0] img_file[470] = {
+    logic [7:0] img_file[470] = '{
         8'hff, 8'hd8, 8'hff, 8'he0, 8'h0, 8'h10, 8'h4a, 8'h46, 8'h49, 8'h46, 8'h0, 8'h1, 8'h1, 8'h0, 8'h0, 8'h1, 
 8'h0, 8'h1, 8'h0, 8'h0, 8'hff, 8'hdb, 8'h0, 8'h43, 8'h0, 8'h8, 8'h6, 8'h6, 8'h7, 8'h6, 8'h5, 8'h8, 8'h7, 
 8'h7, 8'h7, 8'h9, 8'h9, 8'h8, 8'ha, 8'hc, 8'h14, 8'hd, 8'hc, 8'hb, 8'hb, 8'hc, 8'h19, 8'h12, 8'h13, 8'hf, 

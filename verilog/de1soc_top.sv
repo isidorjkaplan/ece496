@@ -18,7 +18,7 @@ module de1soc_top(
     //    .in_data(in_data), .in_valid(in_valid), .out_data(out_data), .out_valid(out_valid), 
     //    .downstream_stall(downstream_stall), .upstream_stall(upstream_stall));
 
-    de1soc_tb_syn tb(clock, reset, out_data, out_valid, downstream_stall)      
+    de1soc_tb_syn tb(clock, reset, out_data, out_valid, downstream_stall);   
 endmodule 
 
 // This is the start of our actual project's DE1SOC adapter
