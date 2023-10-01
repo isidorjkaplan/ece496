@@ -10,7 +10,7 @@ module de1soc_tb();
     logic out_valid;
     logic downstream_stall;
 
-    task automatic read_next_value();
+    task automatic read_next_value(int i);
     begin
         // Ready to read
         downstream_stall = 0;
@@ -19,7 +19,7 @@ module de1soc_tb();
             @(posedge clock);
             #1;
         end
-        $display("Reading 32'h%x", out_data);
+        $display("%d: Reading 32'h%x", i, out_data);
         @(posedge clock);
         downstream_stall = 1;
         @(posedge clock);
@@ -30,7 +30,7 @@ module de1soc_tb();
     task automatic read_values(int N);
     begin
         for (int i = 0; i < N; i++) begin
-            read_next_value();
+            read_next_value(i);
         end
     end
     endtask
@@ -53,10 +53,15 @@ module de1soc_tb();
         #6
         clk_reset = 0;
         @(posedge clock);
+        @(posedge clock);
+        @(posedge clock);
+        @(posedge clock);
+        @(posedge clock);
         reset = 0;
         @(posedge clock);
         
         read_values(28*28);
+        read_values(1000);
         $stop();
     end
 endmodule 
