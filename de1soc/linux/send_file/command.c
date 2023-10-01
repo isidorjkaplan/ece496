@@ -149,7 +149,7 @@ int main (int argc, char *argv[])
 	usleep(30000);  
 	// Flush any initial contents on the Queue
 	
-	int i = 0;
+	/*int i = 0;
 	while (!READ_FIFO_EMPTY) {
 		print_data(FIFO_READ);
 		if (i > 1000) {
@@ -157,13 +157,13 @@ int main (int argc, char *argv[])
 			break;
 		}
 		i++;
-	}
+	}*/
 
 	int read_count = 0;
 	//============================================
-	printf("sudo ./command <file|'skip'> <out_select> <out_cond_bitmask>\n");
-	assert(argc >= 4);
-	if (argv[1] != "skip") {
+	//printf("sudo ./command <file|'skip'> <out_select> <out_cond_bitmask>\n");
+	//assert(argc >= 4);
+	/*if (strcmp(argv[1],"skip") != 0) {
 		printf("Opening file %s\n", argv[1]);
 		FILE* f = fopen(argv[1], "rb");
 		
@@ -211,10 +211,12 @@ int main (int argc, char *argv[])
 		printf("Wrote %d of %d bytes from file.\n", i, size);
 		fclose(f);
 
-	}
+	}*/
 
-	i = 0;
-	while (i < 100*10) {
+	// Send reset signal
+	FIFO_WRITE_BLOCK(0);
+	int i = 0;
+	while (i < 100*30) {
 		// give the FPGA time to finish working
 		usleep(10000);  
 		// Flush any initial contents on the Queue
