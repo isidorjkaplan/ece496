@@ -81,7 +81,7 @@ module img_preproc_top(
         .outport_pixel_r_o(outport_pixel_r_o),
         .outport_pixel_g_o(outport_pixel_g_o),
         .outport_pixel_b_o(outport_pixel_b_o),
-        .idle_o(idle_o),
+        .idle_o(idle_o)
         );
 
 
