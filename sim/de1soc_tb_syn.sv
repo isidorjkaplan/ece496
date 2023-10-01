@@ -40,7 +40,8 @@ module de1soc_tb_syn(
 8'h14, 8'h94, 8'h51, 8'h45, 8'h15, 8'hff, 8'hd9
     };
 
-    logic [2:0] stall_count;
+    parameter STALL_N = 5;
+    logic [STALL_N:0] stall_count;
 
     logic upstream_stall;
 
@@ -48,7 +49,7 @@ module de1soc_tb_syn(
     always_ff@(posedge clock) begin
         if (reset) begin
             in_count = 0;
-        end else if (!upstream_stall && in_count < (img_size+4) && (stall_count==0)) begin
+        end else if (!upstream_stall && in_count < (img_size+4) && stall_count[STALL_N]) begin
             in_count <= (in_count + 4);
         end
 
@@ -63,7 +64,7 @@ module de1soc_tb_syn(
     img_preproc_top dut(.clock(clock), .reset(reset), 
 	// Inputs
 	.in_data((in_count==0)?img_size:{img_file[in_count-1],img_file[in_count-2],img_file[in_count-3],img_file[in_count-4]}), 
-    .in_valid(in_count < (img_size+4) && stall_count==0),
+    .in_valid(in_count < (img_size+4) && stall_count[STALL_N]),
 	// Outputs
 	.out_data(out_data), .out_valid(out_valid), 
 	// Control Flow

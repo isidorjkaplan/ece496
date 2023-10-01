@@ -60,8 +60,6 @@ module jpeg_core
     ,output [  7:0]  outport_pixel_g_o
     ,output [  7:0]  outport_pixel_b_o
     ,output          idle_o
-    ,output [31 : 0] debug_signals[20:0]
-    ,output [18 : 0] debug_conditions
 );
 
 wire  [ 15:0]  idct_outport_data_w;
