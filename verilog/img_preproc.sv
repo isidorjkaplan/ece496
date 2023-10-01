@@ -96,7 +96,7 @@ module img_preproc_top(
     // WARNING: misunderstood inport_accept_o/outport_accept_o, they are handshake signals!!! 
     assign upstream_stall = (byte_count==0) ? 1'b0 : !inport_accept_o; // Can always latch word size, must wait for rest
 
-    assign out_data = 0;
+    assign out_data = {outport_pixel_x_o, outport_pixel_y_o};
     assign out_valid = outport_valid_o;
 
     // DEBUG TAPS
