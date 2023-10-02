@@ -13,60 +13,106 @@ module img_buffer(
     input logic downstream_stall,
     output logic upstream_stall
 );
-    parameter POW2_N = 10;
-
+    parameter POW2_N = 8;
+    
     // Create a ram and control signals
-    logic [ 31 : 0 ] data_buffer_q[1<<POW2_N];
-    logic [ POW2_N-1 : 0 ] data_addr_q;
-
-    // Create the managing FSM
-    logic [ POW2_N-1 : 0 ] total_bytes_q;
+    logic [ POW2_N-1 : 0 ] count_q;
+    logic [ POW2_N-1 : 0 ] total_count_q;
     logic send_mode_q;
+    logic [ 31 : 0 ] data_q;
+
+    // Non register signals
+    logic write_en;
+    logic [ POW2_N-1 : 0 ] next_count;
+    logic [ POW2_N-1 : 0 ] next_total_count;
+    logic next_send_mode;
+    logic [ 31 : 0 ] ram_out;
+    logic [ 31 : 0 ] next_data;
+
+    buffer_ram ram(.clk_i(clock),.addr_i(next_count), .data_i(in_data), .wr_i(write_en), .data_o(ram_out));
     
     // The combinational logic for next state
     always_comb begin
         // Combinational output logic
-        out_data = data_buffer_q[data_addr_q];
         out_valid = send_mode_q;
-        // Stall upstream if we are actively writing out a result
+        out_data = data_q;
         upstream_stall = send_mode_q;
+        // Next signals resetting
+        next_count = count_q;
+        next_total_count = total_count_q;
+        next_send_mode = send_mode_q;
+        next_data = data_q;
+        write_en = 0;
+
+        if (in_valid && total_count_q == 0) begin
+            next_total_count = (in_data>>2) + (in_data[1:0]!=0);
+            next_send_mode = 0;
+            next_count = 1;
+            write_en = 1;
+            next_data = in_data; 
+        end
+        else if (!send_mode_q && in_valid) begin
+            next_count = count_q + 1;
+            write_en = 1;
+            if (next_count >= total_count_q) begin
+                next_count = 1;
+                next_send_mode = 1;
+            end
+        end
+        else if (send_mode_q && !downstream_stall) begin
+            next_count = count_q + 1;
+            next_data = ram_out; 
+            if (next_count >= total_count_q) begin
+                next_count = 0;
+                next_send_mode = 0;
+                next_total_count = 0;
+            end
+        end
     end
 
     // The synchronous logic
     always_ff@(posedge clock) begin
         if (reset) begin
-            total_bytes_q <= 0;
-            data_addr_q <= 0;
+            total_count_q <= 0;
+            count_q <= 0;
             send_mode_q <= 0;
-        end
-        // This is the idle case where we are waiting to start recieving a packet
-        else if (in_valid && !send_mode_q && (total_bytes_q==0)) begin
-            // Record the size of the packet 
-            total_bytes_q <= in_data+4; // Add 4 since we must include this word
-            //packet size is also part of the data that we write to next module
-            data_buffer_q[data_addr_q] <= in_data; 
-            //Reset the addr for rest of write
-            data_addr_q <= 1; // We will start by writing to element 1 since size is written to element 0
-        end
-        // Code that handles the recieving mode
-        else if (in_valid && !send_mode_q) begin
-            data_buffer_q[data_addr_q] <= in_data;
-            data_addr_q <= (data_addr_q+1);
-            // If this is the last data write
-            if ((data_addr_q+1)*4 >= total_bytes_q) begin
-                send_mode_q <= 1; //no longer recieving; we are in transmit mode
-                data_addr_q <= 0; //back to transmitting from the start of accumulated bytes
-            end
-        end
-        // Code that handles transmitting mode incrementing
-        else if (!downstream_stall && send_mode_q) begin
-            data_addr_q <= (data_addr_q+1);
-            if ((data_addr_q+1)*4 >= total_bytes_q) begin
-                send_mode_q <= 0;
-                data_addr_q <= 0;
-                total_bytes_q <= 0;
-            end
+            data_q <= 0;
+        end else begin
+            count_q <= next_count;
+            total_count_q <= next_total_count;
+            send_mode_q <= next_send_mode;
+            data_q <= next_data;
         end
     end
 
 endmodule 
+
+// Adapted from jpeg_idct_ram_dp.v
+module buffer_ram #(parameter WIDTH = 32, parameter ADDR_BITS = 8)
+
+(
+    // Inputs
+     input           clk_i
+    ,input  [  ADDR_BITS-1:0]  addr_i
+    ,input  [ WIDTH-1:0]  data_i
+    ,input           wr_i
+
+    // Outputs
+    ,output [ WIDTH-1:0]  data_o
+);
+
+    reg [WIDTH-1:0]   ram [1<<ADDR_BITS];
+   
+    reg [WIDTH-1:0] ram_read_q;
+
+    // Synchronous write
+    always @ (posedge clk_i)
+    begin
+        if (wr_i)
+            ram[addr_i] <= data_i;
+
+        ram_read_q <= ram[addr_i];
+    end
+
+    assign data_o = ram[addr_i];
+endmodule

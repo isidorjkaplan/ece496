@@ -40,7 +40,7 @@ module de1soc_tb();
     de1soc_tb_syn tb(clock, reset, out_data, out_valid, downstream_stall);
     
     initial begin
-        for (int i = 0; i < 10000; i++) begin
+        for (int i = 0; i < 3000; i++) begin
             @(posedge clock);
         end
         $stop();
