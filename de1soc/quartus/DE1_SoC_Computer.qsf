@@ -971,6 +971,7 @@ set_global_assignment -name TIMEQUEST_MULTICORNER_ANALYSIS ON
 set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
 set_global_assignment -name FITTER_EFFORT "AUTO FIT"
 set_global_assignment -name SMART_RECOMPILE OFF
+set_global_assignment -name SYSTEMVERILOG_FILE ../../verilog/img_buffer.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../sim/de1soc_tb_syn.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../lib/core_jpeg/src_v/jpeg_input.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../lib/core_jpeg/src_v/jpeg_core.sv
