@@ -3,7 +3,8 @@ module de1soc_tb_syn(
     input reset,
     output logic [ 31 : 0 ] out_data,
     output logic out_valid,
-    input downstream_stall
+    input downstream_stall,
+    input resend
 );
     int img_size = 470;
     logic [7:0] img_file[470] = '{
@@ -47,10 +48,12 @@ module de1soc_tb_syn(
 
     logic [15 : 0] in_count;
     always_ff@(posedge clock) begin
-        if (reset) begin
-            in_count = 0;
-        end else if (!upstream_stall && in_count < (img_size+4) && stall_count[STALL_N]) begin
-            in_count <= (in_count + 4);
+        if (reset || resend) begin
+            in_count <= 0;
+        end else if (!upstream_stall && stall_count[STALL_N]) begin
+            if (in_count < (img_size+4)) begin
+                in_count <= (in_count + 4);
+            end
         end
 
         if (reset) begin

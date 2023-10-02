@@ -23,6 +23,7 @@ module img_buffer(
 
     // Non register signals
     logic write_en;
+    logic [ POW2_N-1 : 0 ] ram_addr;
     logic [ POW2_N-1 : 0 ] next_count;
     logic [ POW2_N-1 : 0 ] next_total_count;
     logic next_send_mode;
@@ -43,7 +44,8 @@ module img_buffer(
         next_send_mode = send_mode_q;
         next_data = data_q;
         write_en = 0;
-
+        ram_addr = count_q;
+        
         if (in_valid && total_count_q == 0) begin
             next_total_count = (in_data>>2) + (in_data[1:0]!=0);
             next_send_mode = 0;
@@ -54,18 +56,20 @@ module img_buffer(
         else if (!send_mode_q && in_valid) begin
             next_count = count_q + 1;
             write_en = 1;
-            if (next_count >= total_count_q) begin
+            if (next_count > total_count_q) begin
                 next_count = 1;
                 next_send_mode = 1;
             end
         end
         else if (send_mode_q && !downstream_stall) begin
             next_count = count_q + 1;
+            ram_addr = next_count;
             next_data = ram_out; 
-            if (next_count >= total_count_q) begin
+            if (count_q > total_count_q) begin
                 next_count = 0;
                 next_send_mode = 0;
                 next_total_count = 0;
+                next_data = 0;
             end
         end
     end

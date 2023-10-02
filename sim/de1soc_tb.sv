@@ -5,6 +5,7 @@ module de1soc_tb();
 
     logic clock;
     logic reset;
+    logic resend;
 
     logic [ 31 : 0 ] out_data;
     logic out_valid;
@@ -37,12 +38,20 @@ module de1soc_tb();
 
     assign #5 clock = ~clock & !clk_reset;
 
-    de1soc_tb_syn tb(clock, reset, out_data, out_valid, downstream_stall);
+    de1soc_tb_syn tb(clock, reset, out_data, out_valid, downstream_stall, resend);
     
     initial begin
-        for (int i = 0; i < 3000; i++) begin
+        resend = 0;
+        for (int i = 0; i < 4000; i++) begin
             @(posedge clock);
         end
+        resend = 1;
+        @(posedge clock);
+        resend = 0;
+        for (int i = 0; i < 4000; i++) begin
+            @(posedge clock);
+        end
+        
         $stop();
     end
 
@@ -61,7 +70,8 @@ module de1soc_tb();
         @(posedge clock);
         
         read_values(28*28);
-        read_values(1000);
+        read_values(28*28);
+        read_values(28*28);
         $stop();
     end
 endmodule 
