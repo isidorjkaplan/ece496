@@ -1,6 +1,6 @@
 
 // This is the start of our actual project's DE1SOC adapter
-module img_preproc_top(
+module img_preproc(
     input wire clock, 
     input wire reset, //+ve synchronous reset
 

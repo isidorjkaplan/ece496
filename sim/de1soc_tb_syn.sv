@@ -61,7 +61,7 @@ module de1soc_tb_syn(
     end
 
 
-    img_preproc_top dut(.clock(clock), .reset(reset), 
+    de1soc_top dut(.clock(clock), .reset(reset), 
 	// Inputs
 	.in_data((in_count==0)?img_size:{img_file[in_count-1],img_file[in_count-2],img_file[in_count-3],img_file[in_count-4]}), 
     .in_valid(in_count < (img_size+4) && stall_count[STALL_N]),
