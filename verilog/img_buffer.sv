@@ -30,7 +30,7 @@ module img_buffer(
     logic [ 31 : 0 ] ram_out;
     logic [ 31 : 0 ] next_data;
 
-    buffer_ram ram(.clk_i(clock),.addr_i(next_count), .data_i(in_data), .wr_i(write_en), .data_o(ram_out));
+    buffer_ram #( .ADDR_BITS(POW2_N) ) ram(.clk_i(clock),.addr_i(next_count), .data_i(in_data), .wr_i(write_en), .data_o(ram_out));
     
     // The combinational logic for next state
     always_comb begin

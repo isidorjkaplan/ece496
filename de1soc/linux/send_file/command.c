@@ -148,15 +148,8 @@ int main (int argc, char *argv[])
 	// give the FPGA time to finish working
 	usleep(30000);  
 	// Flush any initial contents on the Queue
-	
-	int i = 0;
 	while (!READ_FIFO_EMPTY) {
 		FIFO_READ;
-		if (i > 1000) {
-			printf("Failed to flush FIFO queue!\n");
-			break;
-		}
-		i++;
 	}
 	printf("Flushed FIFO read queue");
 
@@ -165,6 +158,7 @@ int main (int argc, char *argv[])
 	printf("Usage: sudo ./command <file>\n");
 
 	int read_count = 0;
+	int i = 0;
 
 	if (argc == 2) {
 		printf("Opening file %s\n", argv[1]);
@@ -200,7 +194,6 @@ int main (int argc, char *argv[])
 			printf("Writing word  =0x%x\n", word);
 			i+=bytes;
 			while (!READ_FIFO_EMPTY) {
-				//print_data(FIFO_READ);
 				print_data(FIFO_READ);
 				read_count++;
 			}
