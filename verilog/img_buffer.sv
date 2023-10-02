@@ -114,5 +114,5 @@ module buffer_ram #(parameter WIDTH = 32, parameter ADDR_BITS = 8)
         ram_read_q <= ram[addr_i];
     end
 
-    assign data_o = ram[addr_i];
+    assign data_o = ram_read_q;
 endmodule
