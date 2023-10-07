@@ -13,16 +13,14 @@ module de1soc_tb();
 
     task automatic read_next_value();
     begin
-        // Ready to read
         downstream_stall = 0;
+        // Ready to read
+        //downstream_stall = 0;
         #1;
         while (!out_valid) begin
             @(posedge clock);
             #1;
         end
-        @(posedge clock);
-        downstream_stall = 1;
-        @(posedge clock);
         @(posedge clock);
     end
     endtask
@@ -57,10 +55,18 @@ module de1soc_tb();
 
     de1soc_tb_syn tb(clock, reset, out_data, out_valid, downstream_stall, resend);
     
+    initial begin 
+        for (int i = 0; i < 40000; i++) begin
+            @(posedge clock);
+        end
+        $display("Ran out of time. stopping sim");
+        $stop();
+    end
+    
     initial begin
         resend = 0;
         clk_reset = 1;
-        downstream_stall = 0;
+        downstream_stall = 1;
         reset = 1;
         #6
         clk_reset = 0;
@@ -72,7 +78,7 @@ module de1soc_tb();
         reset = 0;
         @(posedge clock);
         
-        read_values(28*28*10);
+        read_values(32*32*2);
         $stop();
     end
 endmodule 

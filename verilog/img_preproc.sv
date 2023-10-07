@@ -53,6 +53,20 @@ module img_preproc(
 
     // JPEG declaration
 
+
+    logic last_signal;
+    always_ff@(posedge clock) begin
+        if (reset) begin
+            last_signal <= 0;
+        end
+        else if (!last_signal && byte_count > 0 && byte_count <= 4 && in_valid && inport_accept_o) begin 
+            last_signal <= 1;
+        end
+        else if (last_signal && inport_accept_o) begin
+            last_signal <= 0;
+        end
+    end
+
     always_comb begin
         // bitmask for which words are valid, normally all of them
         inport_strb_i = 4'b1111;
@@ -65,14 +79,17 @@ module img_preproc(
             default: inport_strb_i = 4'b1111;
             endcase
         end
-    end
+        if (last_signal) begin
+            inport_strb_i = 0;
+        end
+    end    
 
     jpeg_core jpeg( 
         .clk_i(clock), .rst_i(reset),
-        .inport_valid_i(in_valid && (byte_count != 0)), //if we put 1'b1 than inport_accept goes high
+        .inport_valid_i((in_valid && (byte_count != 0)) || last_signal), //if we put 1'b1 than inport_accept goes high
         .inport_data_i(in_data),
         .inport_strb_i(inport_strb_i), //all bytes are valid (for now)
-        .inport_last_i((byte_count>0 && byte_count <= 4 && in_valid && inport_accept_o)), //last cycle of valid data  
+        .inport_last_i(last_signal), //last cycle of valid data  
         .outport_accept_i(!downstream_stall), //ack when not stalling and we have valid outport
 
         // For now putting this here since we do logic with it seperately

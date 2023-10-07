@@ -68,8 +68,6 @@ module serialize #(parameter N=5) (
     logic [ 31 : 0 ] data_buffer[N];
     logic [$clog2(N)-1:0] word_idx;
 
-
-
     always_ff@(posedge clock) begin
         if (reset) begin
             buffer_valid <= 0;
