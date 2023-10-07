@@ -5,8 +5,6 @@ vlog *.sv
 
 vsim de1soc_tb
 
-add wave tb/dut/*
 add wave tb/dut/buffer/*
-add wave tb/dut/jpeg/*
 
 run -all
