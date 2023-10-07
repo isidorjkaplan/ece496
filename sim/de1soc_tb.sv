@@ -20,7 +20,7 @@ module de1soc_tb();
             @(posedge clock);
             #1;
         end
-        $display("%d: Reading 32'h%x", i, out_data);
+        $display("%d: x=%d, y=%d @ time=%0t", i, out_data[31:16], out_data[15:0], $time);
         @(posedge clock);
         downstream_stall = 1;
         @(posedge clock);
@@ -42,22 +42,22 @@ module de1soc_tb();
     
     initial begin
         resend = 0;
-        for (int i = 0; i < 4000; i++) begin
+        for (int j = 0; j < 1; j++) begin
+            for (int i = 0; i < 4000; i++) begin
+                @(posedge clock);
+            end
+            resend = 1;
             @(posedge clock);
+            resend = 0;
         end
-        resend = 1;
-        @(posedge clock);
-        resend = 0;
-        for (int i = 0; i < 4000; i++) begin
-            @(posedge clock);
-        end
+        resend = 0;      
         
         $stop();
     end
 
     initial begin
         clk_reset = 1;
-        downstream_stall = 1;
+        downstream_stall = 0;
         reset = 1;
         #6
         clk_reset = 0;
@@ -69,9 +69,7 @@ module de1soc_tb();
         reset = 0;
         @(posedge clock);
         
-        read_values(28*28);
-        read_values(28*28);
-        read_values(28*28);
+        read_values(28*28*10);
         $stop();
     end
 endmodule 
