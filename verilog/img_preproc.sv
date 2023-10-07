@@ -1,14 +1,25 @@
 
+typedef struct {
+    logic [ 15:0]  width;
+    logic [ 15:0]  height;
+    logic [ 15:0]  pixel_x;
+    logic [ 15:0]  pixel_y;
+    logic [  7:0]  pixel_r;
+    logic [  7:0]  pixel_g;
+    logic [  7:0]  pixel_b;
+} pixel;
+
+
 // This is the start of our actual project's DE1SOC adapter
 module img_preproc(
     input wire clock, 
     input wire reset, //+ve synchronous reset
 
     input wire [ 31 : 0 ] in_data,
-    input wire in_valid,
+    input wire in_valid, //WARNING must be a burst transaction
 
-    output reg [ 31 : 0 ] out_data,
-    output reg out_valid, 
+    output pixel out_data ,
+    output wire out_valid , 
 
     input wire downstream_stall,
     output wire upstream_stall
@@ -18,13 +29,6 @@ module img_preproc(
     //JPEG CORE PORTS
 
     logic [  3:0]  inport_strb_i;
-    logic [ 15:0]  outport_width_o;
-    logic [ 15:0]  outport_height_o;
-    logic [ 15:0]  outport_pixel_x_o;
-    logic [ 15:0]  outport_pixel_y_o;
-    logic [  7:0]  outport_pixel_r_o;
-    logic [  7:0]  outport_pixel_g_o;
-    logic [  7:0]  outport_pixel_b_o ; 
     logic outport_valid_o;
     logic idle_o;
     logic inport_accept_o;
@@ -74,13 +78,13 @@ module img_preproc(
         // For now putting this here since we do logic with it seperately
         .inport_accept_o(inport_accept_o),
         .outport_valid_o(outport_valid_o),
-        .outport_width_o(outport_width_o),
-        .outport_height_o(outport_height_o),
-        .outport_pixel_x_o(outport_pixel_x_o),
-        .outport_pixel_y_o(outport_pixel_y_o),
-        .outport_pixel_r_o(outport_pixel_r_o),
-        .outport_pixel_g_o(outport_pixel_g_o),
-        .outport_pixel_b_o(outport_pixel_b_o),
+        .outport_width_o(out_data.width),
+        .outport_height_o(out_data.height),
+        .outport_pixel_x_o(out_data.pixel_x),
+        .outport_pixel_y_o(out_data.pixel_y),
+        .outport_pixel_r_o(out_data.pixel_r),
+        .outport_pixel_g_o(out_data.pixel_g),
+        .outport_pixel_b_o(out_data.pixel_b),
         .idle_o(idle_o)
         );
 
@@ -90,8 +94,5 @@ module img_preproc(
     // bug in this, it was glitching, when we set to zero it works but misses some reads.
     // WARNING: misunderstood inport_accept_o/outport_accept_o, they are handshake signals!!! 
     assign upstream_stall = (byte_count==0) ? 1'b0 : !inport_accept_o; // Can always latch word size, must wait for rest
-
-    assign out_data = {outport_pixel_x_o, outport_pixel_y_o};
     assign out_valid = outport_valid_o;
-
 endmodule 

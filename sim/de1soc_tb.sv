@@ -11,7 +11,7 @@ module de1soc_tb();
     logic out_valid;
     logic downstream_stall;
 
-    task automatic read_next_value(int i);
+    task automatic read_next_value();
     begin
         // Ready to read
         downstream_stall = 0;
@@ -20,12 +20,6 @@ module de1soc_tb();
             @(posedge clock);
             #1;
         end
-        // It is okay if it goes up to 32 even though image is 28*28, since we report up until power of two
-        $display("%d: x=%d, y=%d @ time=%0t", i, out_data[31:16], out_data[15:0], $time);
-        if (out_data[31:16] >= 32 || out_data[15:0] >= 32) begin
-            $display("ERROR: Got an invalid output pixel");
-            $stop();
-        end
         @(posedge clock);
         downstream_stall = 1;
         @(posedge clock);
@@ -33,10 +27,28 @@ module de1soc_tb();
     end
     endtask
 
+    task automatic read_next_pixel(int i);
+    begin
+        int x, y, r, g, b;
+        read_next_value();
+        x = out_data;
+        read_next_value();
+        y = out_data;
+        read_next_value();
+        r = out_data;
+        read_next_value();
+        g = out_data;
+        read_next_value();
+        b = out_data;
+
+        $display("%d: Read pixel (x,y)=(%d,%d) with rgb value (%d,%d,%d)", i, x, y, r, g, b);
+    end
+    endtask
+
     task automatic read_values(int N);
     begin
         for (int i = 0; i < N; i++) begin
-            read_next_value(i);
+            read_next_pixel(i);
         end
     end
     endtask
@@ -47,20 +59,6 @@ module de1soc_tb();
     
     initial begin
         resend = 0;
-        for (int j = 0; j < 1; j++) begin
-            for (int i = 0; i < 4000; i++) begin
-                @(posedge clock);
-            end
-            resend = 1;
-            @(posedge clock);
-            resend = 0;
-        end
-        resend = 0;      
-        
-        $stop();
-    end
-
-    initial begin
         clk_reset = 1;
         downstream_stall = 0;
         reset = 1;
