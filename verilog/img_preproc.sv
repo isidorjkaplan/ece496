@@ -68,7 +68,7 @@ module img_preproc(
         .inport_valid_i(in_valid && (byte_count != 0)), //if we put 1'b1 than inport_accept goes high
         .inport_data_i(in_data),
         .inport_strb_i(inport_strb_i), //all bytes are valid (for now)
-        .inport_last_i((byte_count>0 && byte_count <= 4 && in_valid)), //last cycle of valid data  
+        .inport_last_i((byte_count>0 && byte_count <= 4 && in_valid && inport_accept_o)), //last cycle of valid data  
         .outport_accept_i(!downstream_stall), //ack when not stalling and we have valid outport
 
         // For now putting this here since we do logic with it seperately

@@ -20,7 +20,12 @@ module de1soc_tb();
             @(posedge clock);
             #1;
         end
+        // It is okay if it goes up to 32 even though image is 28*28, since we report up until power of two
         $display("%d: x=%d, y=%d @ time=%0t", i, out_data[31:16], out_data[15:0], $time);
+        if (out_data[31:16] >= 32 || out_data[15:0] >= 32) begin
+            $display("ERROR: Got an invalid output pixel");
+            $stop();
+        end
         @(posedge clock);
         downstream_stall = 1;
         @(posedge clock);
