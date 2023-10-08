@@ -14,39 +14,6 @@ module de1soc_top(
     output wire upstream_stall
 );
 
-    logic [31 : 0] buffer_out_data;
-    logic buffer_out_valid;
-    logic img_preproc_upstream_stall;
-
-    img_buffer buffer(.clock(clock), .reset(reset), 
-        .in_data(in_data), .in_valid(in_valid), .out_data(buffer_out_data), .out_valid(buffer_out_valid), 
-        .downstream_stall(img_preproc_upstream_stall), .upstream_stall(upstream_stall));
-
-
-    img_preproc_sv_unit::pixel jpeg_out_data;
-    logic jpeg_out_valid;
-    logic jpeg_downstream_stall;
-    img_preproc jpeg(.clock(clock), .reset(reset), 
-        .in_data(buffer_out_data), .in_valid(buffer_out_valid), 
-        
-        .out_data(jpeg_out_data), .out_valid(jpeg_out_valid),
-
-        .downstream_stall(jpeg_downstream_stall), .upstream_stall(img_preproc_upstream_stall));
-
-
-    serialize pixel_to_de1soc(.clock(clock), .reset(reset), 
-        .in_data({
-            jpeg_out_data.pixel_x, 
-            jpeg_out_data.pixel_y, 
-            jpeg_out_data.pixel_r, 
-            jpeg_out_data.pixel_g, 
-            jpeg_out_data.pixel_b 
-        }), 
-        .in_valid(jpeg_out_valid),
-        .out_data(out_data), .out_valid(out_valid), .upstream_stall(jpeg_downstream_stall), .downstream_stall(downstream_stall));
-
-    //assign upstream_stall = 1'b0;
-    //de1soc_tb_syn tb(.clock(clock), .reset(reset || in_valid), .out_data(out_data), .out_valid(out_valid), .downstream_stall(downstream_stall));   
 endmodule 
 
 
