@@ -13,7 +13,7 @@ module de1soc_top(
     input wire downstream_stall,
     output wire upstream_stall
 );
-
+    
 endmodule 
 
 
