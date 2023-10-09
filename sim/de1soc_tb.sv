@@ -84,7 +84,22 @@ module de1soc_tb();
         for (int i = 0; i < 10000; i++) begin
             @(posedge clock);
         end
-        $display("Ran out of time -- murdering simulator");
+        $display("Ran out of time -- murdering simulator\n");
+        $stop();
+    end
+
+    // Reader thread
+    initial begin
+        // Wait until writer thread reliably running
+        for (int i = 0; i < 20; i++) begin
+            @(posedge clock);
+        end
+
+        for (int i = 0; i < 28-2; i++) begin
+            read_values(28);
+            $display("Read result row %d", i);
+        end
+        $display("Reader thread finished -- Killing simulator\n");
         $stop();
     end
 
@@ -98,22 +113,13 @@ module de1soc_tb();
         @(posedge clock);
         reset = 0;
         @(posedge clock);
-        //for (int i = 0; i < 100; i++) begin
-        //    write_value(i);
-        //end
+
         for (int i = 0; i < 28; i++) begin
             write_row(i);
-            if (i >= 2) begin
-                read_values(28);
-            end
+            $display("Wrote row %d", i);
         end
-        // Should fail forever
-        //read_values(1);
+        $display("Writer thread finished");
         
-        for (int i = 0; i < 1000; i++) begin
-            @(posedge clock);
-        end
-        $stop();
     end
 endmodule 
 

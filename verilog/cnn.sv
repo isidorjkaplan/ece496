@@ -190,13 +190,11 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS
                 // Get the next row
                 buffer_shift_vert = 1;
                 next_row_idx = row_idx_q + 1;
+                in_row_accept_o = 1;
                 // Change state to be calculating over that row
                 if (next_row_idx >= KERNAL_SIZE) begin
                     next_state = S_CALC_ROW_WAIT;
                     next_col_idx = 0;
-                end
-                else begin
-                    in_row_accept_o = 1;
                 end
             end
         end
@@ -217,8 +215,6 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS
             if (next_col_idx*NUM_KERNALS >= WIDTH) begin
                 next_state = S_WAIT_ROW_READ;
                 next_out_row_valid = 1;
-                // Accept the row read; the input can now put a new value on its input port
-                in_row_accept_o = 1;
                 //if this is the last row so after we are starting next image
                 if (in_row_last_i) begin
                     next_row_idx = 0; 
