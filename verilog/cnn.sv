@@ -17,7 +17,7 @@ module cnn_top(
     parameter VALUE_BITS=8;
     parameter WEIGHT_BITS=8;
     parameter WEIGHT_Q_SHIFT=6;
-    parameter KERNAL_SIZE=3;
+    parameter KERNAL_SIZE=2;
     parameter WIDTH=28;
     parameter IN_CHANNELS=1;
     parameter OUT_CHANNELS=1;
@@ -28,11 +28,12 @@ module cnn_top(
     logic [VALUE_BITS-1 : 0] in_row_i[WIDTH][IN_CHANNELS];
     logic in_row_valid_i, in_row_accept_o, in_row_last_i;
     
-    logic [VALUE_BITS -1 : 0] out_row_o[WIDTH][OUT_CHANNELS];
+    logic [VALUE_BITS -1 : 0] out_row_o[WIDTH/KERNAL_SIZE][OUT_CHANNELS];
     logic out_row_valid_o;
     logic out_row_accept_i;
     logic out_row_last_o;
 
+    /*
     cnn_layer #(
         .KERNAL_SIZE(KERNAL_SIZE), .NUM_KERNALS(NUM_KERNALS), 
         .WIDTH(WIDTH), .VALUE_BITS(VALUE_BITS), .WEIGHT_BITS(WEIGHT_BITS), .WEIGHT_Q_SHIFT(WEIGHT_Q_SHIFT), .IN_CHANNELS(IN_CHANNELS), .OUT_CHANNELS(OUT_CHANNELS)
@@ -40,6 +41,23 @@ module cnn_top(
         // General
         .clock_i(clock), .reset_i(reset),
         .kernal_weights_i(kernal_weights_i),
+        // INPUT INFO
+        .in_row_i(in_row_i),
+        .in_row_valid_i(in_row_valid_i),
+        .in_row_accept_o(in_row_accept_o),
+        .in_row_last_i(in_row_last_i),
+        // OUT INFO
+        .out_row_o(out_row_o),
+        .out_row_valid_o(out_row_valid_o),
+        .out_row_accept_i(out_row_accept_i),
+        .out_row_last_o(out_row_last_o)
+    );*/
+    max_pooling_layer #(
+        .KERNAL_SIZE(KERNAL_SIZE), .NUM_KERNALS(NUM_KERNALS), 
+        .WIDTH(WIDTH), .VALUE_BITS(VALUE_BITS), .CHANNELS(IN_CHANNELS)
+    ) pool0 (
+        // General
+        .clock_i(clock), .reset_i(reset),
         // INPUT INFO
         .in_row_i(in_row_i),
         .in_row_valid_i(in_row_valid_i),
@@ -123,19 +141,20 @@ module max_pooling_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS
     logic [VALUE_BITS - 1 : 0] in_row_q[WIDTH][CHANNELS];
     logic [VALUE_BITS - 1 : 0] out_row_q[OUT_WIDTH][CHANNELS];
     logic [ $clog2(OUT_WIDTH)-1 : 0 ] pos_idx_q; // in output, not in input
-    logic [ $clog2(KERNAL_SIZE)-1 : 0 ] row_count_q;
+    logic [ $clog2(KERNAL_SIZE) : 0 ] row_count_q;
     e_state state_q; 
     logic in_row_last_q;
 
     // Output logic
     assign out_row_o = out_row_q;
+    assign out_row_last_o = in_row_last_q; //qualified by out_valid so can just set this here now
 
     // Combinational signals
     logic latch_in_row;
     logic reset_output_row;
     logic [VALUE_BITS - 1 : 0] next_out_row[OUT_WIDTH][CHANNELS];
     logic [ $clog2(OUT_WIDTH)-1 : 0 ] next_pos_idx;
-    logic [ $clog2(KERNAL_SIZE)-1 : 0 ] next_row_count;
+    logic [ $clog2(KERNAL_SIZE) : 0 ] next_row_count;
     e_state next_state;
 
     // Temp signals to use as local vriables inside of always_comb but who have no meaningful output value
@@ -184,7 +203,8 @@ module max_pooling_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS
             // Check if overflow, that is, if position we get for first kernal is within second kernals range of pixels
             if ( pos_idx_q*KERNAL_SIZE  >= WIDTH/NUM_KERNALS) begin
                 next_row_count = row_count_q + 1;
-                if (next_row_count == KERNAL_SIZE) begin
+                // If we have done the y-dimension component of the max-pool, or this is last row
+                if (next_row_count == KERNAL_SIZE || in_row_last_q) begin
                     next_state = S_WAIT_ROW_READ;
                 end else begin
                     next_state = S_GET_NEXT_ROW;
@@ -207,7 +227,7 @@ module max_pooling_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS
 
 
     always_ff@(posedge clock_i) begin
-        if (reset) begin
+        if (reset_i) begin
             state_q <= S_GET_NEXT_ROW;
             pos_idx_q <= 0;
             in_row_last_q <= 0;
@@ -224,7 +244,7 @@ module max_pooling_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS
         end
         
         // Logic to reset all the output latched values to 0 when we get the signal to
-        if (reset || reset_output_row) begin
+        if (reset_i || reset_output_row) begin
             for (int x = 0; x < OUT_WIDTH; x++) begin
                 for (int ch_num = 0; ch_num < CHANNELS; ch_num++) begin
                     out_row_q[x][ch_num] <= 0;
