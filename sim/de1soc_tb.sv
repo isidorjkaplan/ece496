@@ -1,6 +1,117 @@
 `timescale 1ns/1ns
 
+
 module de1soc_tb();
+    logic clk_reset;
+
+    logic clock;
+    logic reset;
+
+    logic [ 31 : 0 ] in_data;
+    logic in_valid;
+
+    logic [ 31 : 0 ] out_data;
+    logic out_valid;
+
+    logic downstream_stall;
+    logic upstream_stall;
+    cnn_top dut(.clock(clock), .reset(reset), 
+	// Inputs
+	.in_data(in_data), .in_valid(in_valid),
+	// Outputs
+	.out_data(out_data), .out_valid(out_valid), 
+	// Control Flow
+	.downstream_stall(downstream_stall), .upstream_stall(upstream_stall));
+
+    task automatic write_value(input [31:0] value);
+    begin
+        in_data = value;
+        in_valid = 1;
+        #1
+        while (upstream_stall) begin
+            @(posedge clock);
+            #1;
+            //$display("Stalling while writing: %x", value);
+        end
+        //$assert(!upstream_stall && in_valid);
+        if (upstream_stall) begin
+            $display("FAILED");
+            $stop();
+        end
+        @(posedge clock);
+        in_valid = 0;
+        @(posedge clock);
+        @(posedge clock);
+    end
+    endtask
+
+    task automatic write_row(int N);
+    begin
+        for (int i = 0; i < 28; i++) begin
+            write_value(i + N*28);
+        end
+    end
+    endtask
+
+    task automatic read_next_value();
+    begin
+        // Ready to read
+        downstream_stall = 0;
+        #1;
+        while (!out_valid) begin
+            @(posedge clock);
+            #1;
+        end
+        //$display("Reading 32'h%x", out_data);
+        @(posedge clock);
+        downstream_stall = 1;
+        @(posedge clock);
+        @(posedge clock);
+    end
+    endtask
+
+    task automatic read_values(int N);
+    begin
+        for (int i = 0; i < N; i++) begin
+            read_next_value();
+        end
+    end
+    endtask
+
+    assign #5 clock = ~clock & !clk_reset;
+    
+    initial begin
+        for (int i = 0; i < 10000; i++) begin
+            @(posedge clock);
+        end
+        $display("Ran out of time -- murdering simulator");
+        $stop();
+    end
+
+    initial begin
+        clk_reset = 1;
+        downstream_stall = 1;
+        reset = 1;
+        in_valid = 0;
+        #6
+        clk_reset = 0;
+        @(posedge clock);
+        reset = 0;
+        @(posedge clock);
+        //for (int i = 0; i < 100; i++) begin
+        //    write_value(i);
+        //end
+        for (int i = 0; i < 28; i++) begin
+            write_row(i);
+            if (i >= 2) begin
+                read_values(28);
+            end
+        end
+        $stop();
+    end
+endmodule 
+
+module layer_tb();
     logic clk_reset;
 
     logic clock; 

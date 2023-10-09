@@ -29,8 +29,9 @@ module cnn_top(
     logic [VALUE_BITS-1 : 0] in_row_i[WIDTH][IN_CHANNELS];
     logic in_row_valid_i, in_row_accept_o, in_row_last_i;
     
+    parameter OUT_WIDTH = WIDTH/STRIDE;
 
-    logic [VALUE_BITS -1 : 0] out_row_o[WIDTH/STRIDE][OUT_CHANNELS];
+    logic [VALUE_BITS -1 : 0] out_row_o[OUT_WIDTH][OUT_CHANNELS];
     logic out_row_valid_o;
     logic out_row_accept_i;
     logic out_row_last_o;
@@ -55,36 +56,43 @@ module cnn_top(
     );
 
     // GLUE LOGIC TO MAKE SURE NEURAL NETWORK NOT OPTIMIZED AWAY FOR AREA/POWER/FMAX CALCULATIONS
+    logic [VALUE_BITS-1 : 0] in_row_par[WIDTH*IN_CHANNELS];
 
-    logic [7:0] in_bytes[4];
-    assign in_bytes = '{in_data[31:24], in_data[23:16], in_data[15:8], in_data[7:0]};
+    parallelize #(.N(WIDTH*IN_CHANNELS), .DATA_BITS(VALUE_BITS)) par2ser(
+        .clock(clock), .reset(reset), 
+        .in_data(in_data), .in_valid(in_valid), 
+        .out_data(in_row_par), .out_valid(in_row_valid_i),
+        .downstream_stall(!in_row_accept_o), .upstream_stall(upstream_stall)
+    );
+
+    logic [31 : 0] out_row_par[OUT_WIDTH*OUT_CHANNELS];
+    serialize #(.N(OUT_WIDTH*OUT_CHANNELS), .DATA_BITS(32)) ser2par(
+        .clock(clock), .reset(reset), 
+        .in_data(out_row_par), .in_valid(out_row_valid_o),
+        .out_data(out_data), .out_valid(out_valid),
+        .downstream_stall(downstream_stall), .upstream_stall(out_row_accept_i)
+    );
 
     always_comb begin
-        for (int x = 0; x < WIDTH; x++) begin
-            for (int in_ch = 0; in_ch < IN_CHANNELS; in_ch++) begin
-                in_row_i[x][in_ch] = in_bytes[(x%4)];
-            end
-        end
         for (int out_ch = 0; out_ch < OUT_CHANNELS; out_ch++) begin
             for (int in_ch = 0; in_ch < IN_CHANNELS; in_ch++) begin
                 for (int x = 0; x < KERNAL_SIZE; x++) begin
                     for (int y = 0; y < KERNAL_SIZE; y++) begin
-                        kernal_weights_i[out_ch][in_ch][x][y] = in_bytes[(x+y)%4];
+                        kernal_weights_i[out_ch][in_ch][x][y] = (1<<WEIGHT_Q_SHIFT)/(OUT_CHANNELS*IN_CHANNELS*KERNAL_SIZE*KERNAL_SIZE);
                     end
                 end
             end
         end
-        in_row_valid_i = in_valid;
-        upstream_stall = !in_row_accept_o;
         in_row_last_i = 0;
 
-        out_valid = out_row_valid_o;
-        out_row_accept_i = !downstream_stall;
-        out_data = 0;
-        for (int x = 0; x < WIDTH/STRIDE; x++) begin
+        for (int x = 0; x < OUT_WIDTH; x++) begin
             for (int out_ch = 0; out_ch < OUT_CHANNELS; out_ch++) begin
-                // To ensure that it does not optimize out out_row_o
-                out_data += out_row_o[x][out_ch];
+                out_row_par[x + out_ch*OUT_WIDTH] = out_row_o[x][out_ch];
+            end
+        end
+        for (int x = 0; x < WIDTH; x++) begin
+            for (int in_ch = 0; in_ch < IN_CHANNELS; in_ch++) begin
+                in_row_i[x][in_ch] = in_row_par[x + in_ch*WIDTH];
             end
         end
     end
