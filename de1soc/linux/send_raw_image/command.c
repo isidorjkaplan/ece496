@@ -162,14 +162,18 @@ int main (int argc, char *argv[])
 		for (x = 0; x < 28; x++) {
 			FIFO_WRITE_BLOCK(x + 28*y);
 		}
-		printf("Wrote row=%d", y);
+		printf("Wrote row=%d\n", y);
 		if (y >= 2) {
 			for (x = 0; x < 28; x++) {
 				while (!READ_FIFO_EMPTY) {
 					x++;
+					FIFO_READ;
+				}
+				if (x > 28) {
+					printf("WARNING: Read more than 28 row results!!!\n");
 				}
 			}
-			printf("Read result row=%d", y-2);
+			printf("Read result row=%d\n", y-2);
 		}	
 	}
 
