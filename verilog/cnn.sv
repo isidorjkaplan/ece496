@@ -96,6 +96,148 @@ module cnn_top(
 endmodule 
 
 
+module max_pooling_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS, CHANNELS) (
+    // General signals
+    input clock_i, input reset_i,
+    // next row logic
+    input logic [VALUE_BITS - 1 : 0] in_row_i[WIDTH][CHANNELS], 
+    input logic in_row_valid_i, 
+    output logic in_row_accept_o, // must be high before in_row_i moves to next value
+    input logic in_row_last_i,  // if raised we are done
+    // output row valid 
+    output logic [VALUE_BITS - 1 : 0] out_row_o[WIDTH/KERNAL_SIZE][CHANNELS],
+    output logic out_row_valid_o,
+    output logic out_row_last_o,
+    input logic out_row_accept_i
+);
+    // The state transitions for this layer
+    typedef enum {
+        S_GET_NEXT_ROW, 
+        S_CALC_ROW, 
+        S_WAIT_ROW_READ
+    } e_state;
+
+    localparam OUT_WIDTH = WIDTH/KERNAL_SIZE;
+
+    // Buffer with output row
+    logic [VALUE_BITS - 1 : 0] in_row_q[WIDTH][CHANNELS];
+    logic [VALUE_BITS - 1 : 0] out_row_q[OUT_WIDTH][CHANNELS];
+    logic [ $clog2(OUT_WIDTH)-1 : 0 ] pos_idx_q; // in output, not in input
+    logic [ $clog2(KERNAL_SIZE)-1 : 0 ] row_count_q;
+    e_state state_q; 
+    logic in_row_last_q;
+
+    // Output logic
+    assign out_row_o = out_row_q;
+
+    // Combinational signals
+    logic latch_in_row;
+    logic reset_output_row;
+    logic [VALUE_BITS - 1 : 0] next_out_row[OUT_WIDTH][CHANNELS];
+    logic [ $clog2(OUT_WIDTH)-1 : 0 ] next_pos_idx;
+    logic [ $clog2(KERNAL_SIZE)-1 : 0 ] next_row_count;
+    e_state next_state;
+
+    // Temp signals to use as local vriables inside of always_comb but who have no meaningful output value
+    logic [ $clog2(WIDTH)-1 : 0 ] tmp_input_idx;
+
+    always_comb begin
+        // Default values
+        latch_in_row = 0;
+        reset_output_row = 0;
+        in_row_accept_o = 0;
+        out_row_valid_o = 0;
+        
+        next_out_row = out_row_q;
+        next_pos_idx = pos_idx_q;
+        next_state = state_q;
+        next_row_count = row_count_q;
+        // FSM logic
+        case (state_q)
+        S_GET_NEXT_ROW: begin
+            if (in_row_valid_i) begin
+                latch_in_row = 1;
+                in_row_accept_o = 1;
+                next_pos_idx = 0;
+                next_state = S_CALC_ROW;
+            end
+        end
+        S_CALC_ROW: begin
+            next_pos_idx = pos_idx_q + 1;
+            // Actual computing of kernal
+            for (int kernal_num = 0; kernal_num < NUM_KERNALS; kernal_num++) begin
+                // Each kernal computes one instance of kernal_width 
+                for (int offset = 0; offset < KERNAL_SIZE; offset++) begin
+                    // Compute location in input and make sure no roundoff errors (it must be in bounds)
+                    tmp_input_idx = pos_idx_q*KERNAL_SIZE + kernal_num*NUM_KERNALS/WIDTH + offset;
+                    if (tmp_input_idx < WIDTH) begin
+                        // For all channels we do this operation
+                        for (int ch_num = 0; ch_num < CHANNELS; ch_num++) begin
+                            // Update value we will write if it is greater than current values for row
+                            if (next_out_row[ pos_idx_q ][ch_num] < in_row_q[ tmp_input_idx ][ch_num] ) begin
+                                next_out_row[ pos_idx_q ][ch_num] = in_row_q[ tmp_input_idx ][ch_num];
+                            end
+                        end
+                    end
+                end
+            end
+            // Check if overflow, that is, if position we get for first kernal is within second kernals range of pixels
+            if ( pos_idx_q*KERNAL_SIZE  >= WIDTH/NUM_KERNALS) begin
+                next_row_count = row_count_q + 1;
+                if (next_row_count == KERNAL_SIZE) begin
+                    next_state = S_WAIT_ROW_READ;
+                end else begin
+                    next_state = S_GET_NEXT_ROW;
+                end
+            end
+
+        end
+        S_WAIT_ROW_READ: begin
+            // When in this state the output row is valid
+            out_row_valid_o = 1;
+            if (out_row_accept_i) begin
+                next_state = S_GET_NEXT_ROW;
+                reset_output_row = 1;
+                next_row_count = 0;
+            end
+        end
+        endcase
+        tmp_input_idx = 0 ; //don't actually store a value here when exiting the always block
+    end
+
+
+    always_ff@(posedge clock_i) begin
+        if (reset) begin
+            state_q <= S_GET_NEXT_ROW;
+            pos_idx_q <= 0;
+            in_row_last_q <= 0;
+            row_count_q <= 0;
+        end else begin
+            if (latch_in_row) begin
+                in_row_q <= in_row_i;
+                in_row_last_q <= in_row_last_i;
+            end
+            row_count_q <= next_row_count;
+            out_row_q <= next_out_row;
+            pos_idx_q <= next_pos_idx;
+            state_q <= next_state;
+        end
+        
+        // Logic to reset all the output latched values to 0 when we get the signal to
+        if (reset || reset_output_row) begin
+            for (int x = 0; x < OUT_WIDTH; x++) begin
+                for (int ch_num = 0; ch_num < CHANNELS; ch_num++) begin
+                    out_row_q[x][ch_num] <= 0;
+                end
+            end
+        end
+    end
+
+
+endmodule 
+
+
+
 module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS, WEIGHT_BITS, WEIGHT_Q_SHIFT, IN_CHANNELS, OUT_CHANNELS) (
     // General signals
     input clock_i, input reset_i,
