@@ -2,17 +2,17 @@
 
 // Input is streamed where we recieve an image as 28*28 individual transfers with the grayscale values
 module cnn_top(
-    input wire clock, 
-    input wire reset, //+ve synchronous reset
+    input logic clock, 
+    input logic reset, //+ve synchronous reset
 
-    input wire [ 31 : 0 ] in_data,
-    input wire in_valid,
+    input logic [ 31 : 0 ] in_data,
+    input logic in_valid,
 
-    output reg [ 31 : 0 ] out_data,
-    output reg out_valid, 
+    output logic [ 31 : 0 ] out_data,
+    output logic out_valid, 
 
-    input wire downstream_stall,
-    output wire upstream_stall
+    input logic downstream_stall,
+    output logic upstream_stall
 );    
     parameter VALUE_BITS=8;
     parameter WEIGHT_BITS=16;
@@ -20,8 +20,8 @@ module cnn_top(
     parameter KERNAL_SIZE=3;
     parameter WIDTH=28;
     parameter IN_CHANNELS=1;
-    parameter OUT_CHANNELS=2;
-    parameter NUM_KERNALS=1;
+    parameter OUT_CHANNELS=3;
+    parameter NUM_KERNALS=2;
     parameter STRIDE=1;
 
     logic  [ WEIGHT_BITS-1 : 0 ] kernal_weights_i[OUT_CHANNELS][IN_CHANNELS][KERNAL_SIZE][KERNAL_SIZE];
@@ -84,7 +84,7 @@ module cnn_top(
         for (int x = 0; x < WIDTH/STRIDE; x++) begin
             for (int out_ch = 0; out_ch < OUT_CHANNELS; out_ch++) begin
                 // To ensure that it does not optimize out out_row_o
-                out_data[x] ^= ^out_row_o[x][out_ch];
+                out_data += out_row_o[x][out_ch];
             end
         end
     end
@@ -261,7 +261,7 @@ module shift_buffer_array #(parameter WIDTH, HEIGHT, TAP_WIDTH, NUM_TAPS, VALUE_
                 for (int tap_width = 0; tap_width < TAP_WIDTH; tap_width++) begin
                     for (int tap_height = 0; tap_height < HEIGHT; tap_height++) begin
                         // TODO add in num_tap into width offset instead of just tapping offset relative to start
-                        taps_o[ num_tap ][ ch_num ][ tap_width ][ tap_height ] = buffer[ ((num_tap*WIDTH)/NUM_TAPS) + tap_width ][ tap_height ][ ch_num ];
+                        taps_o[ num_tap ][ ch_num ][ tap_width ][ tap_height ] = buffer[ tap_width ][ tap_height ][ ch_num ];
                     end
                 end
             end
