@@ -148,74 +148,28 @@ int main (int argc, char *argv[])
 	// give the FPGA time to finish working
 	usleep(30000);  
 	// Flush any initial contents on the Queue
+	int read_count = 0;
 	while (!READ_FIFO_EMPTY) {
 		FIFO_READ;
+		read_count++;
 	}
-	printf("Flushed FIFO read queue");
 
+	printf("Flushed FIFO read queue with %d elements", read_count);
 
-	//============================================
-	printf("Usage: sudo ./command <file>\n");
-
-	int read_count = 0;
-	int i = 0;
-
-	if (argc == 2) {
-		printf("Opening file %s\n", argv[1]);
-		FILE* f = fopen(argv[1], "rb");
-		
-		if (!f) {
-			fprintf(stderr, "Failed to open file: %s\n", argv[1]);
-			exit(1);
+	for (int y = 0; y < 28; y++) {
+		for (int x = 0; x < 28; x++) {
+			FIFO_WRITE_BLOCK(x + 28*y);
 		}
-
-		int size;
-		// Get size
-		fseek(f, 0, SEEK_END);
-		size = ftell(f);
-		//assert(size % 4 == 0);
-		rewind(f);
-
-		printf("File is %d words (4 bytes/word)\n", size);
-		
-		i = 0;
-		//reset the device
-		//FIFO_WRITE_BLOCK(0);
-		//tell it how many words we will send
-		FIFO_WRITE_BLOCK(size);
-		//send the words
-		while(!feof(f) && i < size)
-		{
-			unsigned int word = 0;
-			//cannot do more then 4 bytes at a time
-			unsigned int bytes = MIN(size-i, 4); 
-			fread(&word, 1, bytes,f);
-			FIFO_WRITE_BLOCK(word);
-			printf("Writing word  =0x%x\n", word);
-			i+=bytes;
-			while (!READ_FIFO_EMPTY) {
-				print_data(FIFO_READ);
-				read_count++;
+		printf("Wrote row=%d", y);
+		if (y >= 2) {
+			for (int x = 0; x < 28; x++) {
+				while (!READ_FIFO_EMPTY) {
+					x++;
+				}
 			}
-		}
-		printf("Wrote %d of %d bytes from file.\n", i, size);
-		fclose(f);
-
+			printf("Read result row=%d", y-2);
+		}	
 	}
-
-	// Send reset signal
-	i = 0;
-	while (i < 100*30) {
-		// give the FPGA time to finish working
-		usleep(10000);  
-		// Flush any initial contents on the Queue
-		while (!READ_FIFO_EMPTY) {
-			print_data(FIFO_READ);
-			read_count++;
-		}
-		i++;
-	}
-	printf("Read total of %d words\n", read_count);
 
 	printf("Program Done\n");
 	exit(0);
