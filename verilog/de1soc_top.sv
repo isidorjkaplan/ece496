@@ -96,6 +96,6 @@ module serialize #(parameter N, DATA_BITS=32) (
 
     assign upstream_stall = buffer_valid;
     assign out_valid = buffer_valid;
-    assign out_data = in_data[word_idx];
+    assign out_data = data_buffer[word_idx];
 
 endmodule
