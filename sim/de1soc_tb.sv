@@ -137,20 +137,20 @@ module layer_tb();
     parameter IN_CHANNELS=1;
     parameter OUT_CHANNELS=2;
     parameter NUM_KERNALS=1;
-    parameter STRIDE=1;
+
 
     logic  [ WEIGHT_BITS-1 : 0 ] kernal_weights_i[OUT_CHANNELS][IN_CHANNELS][KERNAL_SIZE][KERNAL_SIZE];
 
     logic [VALUE_BITS-1 : 0] in_row_i[WIDTH][IN_CHANNELS];
     logic in_row_valid_i, in_row_accept_o, in_row_last_i;
 
-    logic [VALUE_BITS -1 : 0] out_row_o[WIDTH/STRIDE][OUT_CHANNELS];
+    logic [VALUE_BITS -1 : 0] out_row_o[WIDTH][OUT_CHANNELS];
     logic out_row_valid_o;
     logic out_row_accept_i;
     logic out_row_last_o;
 
     cnn_layer #(
-        .KERNAL_SIZE(KERNAL_SIZE), .NUM_KERNALS(NUM_KERNALS), .STRIDE(STRIDE), 
+        .KERNAL_SIZE(KERNAL_SIZE), .NUM_KERNALS(NUM_KERNALS), 
         .WIDTH(WIDTH), .VALUE_BITS(VALUE_BITS), .WEIGHT_BITS(WEIGHT_BITS), .WEIGHT_Q_SHIFT(WEIGHT_Q_SHIFT), .IN_CHANNELS(IN_CHANNELS), .OUT_CHANNELS(OUT_CHANNELS)
     ) layer0(
         // General

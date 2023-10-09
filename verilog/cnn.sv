@@ -22,22 +22,19 @@ module cnn_top(
     parameter IN_CHANNELS=1;
     parameter OUT_CHANNELS=1;
     parameter NUM_KERNALS=1;
-    parameter STRIDE=1;
 
     logic  [ WEIGHT_BITS-1 : 0 ] kernal_weights_i[OUT_CHANNELS][IN_CHANNELS][KERNAL_SIZE][KERNAL_SIZE];
 
     logic [VALUE_BITS-1 : 0] in_row_i[WIDTH][IN_CHANNELS];
     logic in_row_valid_i, in_row_accept_o, in_row_last_i;
     
-    parameter OUT_WIDTH = WIDTH/STRIDE;
-
-    logic [VALUE_BITS -1 : 0] out_row_o[OUT_WIDTH][OUT_CHANNELS];
+    logic [VALUE_BITS -1 : 0] out_row_o[WIDTH][OUT_CHANNELS];
     logic out_row_valid_o;
     logic out_row_accept_i;
     logic out_row_last_o;
 
     cnn_layer #(
-        .KERNAL_SIZE(KERNAL_SIZE), .NUM_KERNALS(NUM_KERNALS), .STRIDE(STRIDE), 
+        .KERNAL_SIZE(KERNAL_SIZE), .NUM_KERNALS(NUM_KERNALS), 
         .WIDTH(WIDTH), .VALUE_BITS(VALUE_BITS), .WEIGHT_BITS(WEIGHT_BITS), .WEIGHT_Q_SHIFT(WEIGHT_Q_SHIFT), .IN_CHANNELS(IN_CHANNELS), .OUT_CHANNELS(OUT_CHANNELS)
     ) layer0(
         // General
@@ -65,8 +62,8 @@ module cnn_top(
         .downstream_stall(!in_row_accept_o), .upstream_stall(upstream_stall)
     );
 
-    logic [VALUE_BITS-1 : 0] out_row_par[OUT_WIDTH*OUT_CHANNELS];
-    serialize #(.N(OUT_WIDTH*OUT_CHANNELS), .DATA_BITS(VALUE_BITS), .DATA_PER_WORD(1)) ser2par(
+    logic [VALUE_BITS-1 : 0] out_row_par[WIDTH*OUT_CHANNELS];
+    serialize #(.N(WIDTH*OUT_CHANNELS), .DATA_BITS(VALUE_BITS), .DATA_PER_WORD(1)) ser2par(
         .clock(clock), .reset(reset), 
         .in_data(out_row_par), .in_valid(out_row_valid_o),
         .out_data(out_data), .out_valid(out_valid),
@@ -85,9 +82,9 @@ module cnn_top(
         end
         in_row_last_i = 0;
 
-        for (int x = 0; x < OUT_WIDTH; x++) begin
+        for (int x = 0; x < WIDTH; x++) begin
             for (int out_ch = 0; out_ch < OUT_CHANNELS; out_ch++) begin
-                out_row_par[x + out_ch*OUT_WIDTH] = out_row_o[x][out_ch];
+                out_row_par[x + out_ch*WIDTH] = out_row_o[x][out_ch];
             end
         end
         for (int x = 0; x < WIDTH; x++) begin
@@ -99,7 +96,7 @@ module cnn_top(
 endmodule 
 
 
-module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS, WEIGHT_BITS, WEIGHT_Q_SHIFT, IN_CHANNELS, OUT_CHANNELS) (
+module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS, WEIGHT_BITS, WEIGHT_Q_SHIFT, IN_CHANNELS, OUT_CHANNELS) (
     // General signals
     input clock_i, input reset_i,
     // Constant but dynamic layer config
@@ -110,15 +107,13 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS
     output logic in_row_accept_o, // must be high before in_row_i moves to next value
     input logic in_row_last_i,  // if raised we are done
     // output row valid 
-    output logic [VALUE_BITS -1 : 0] out_row_o[WIDTH/STRIDE][OUT_CHANNELS],
+    output logic [VALUE_BITS -1 : 0] out_row_o[WIDTH][OUT_CHANNELS],
     output logic out_row_valid_o,
     output logic out_row_last_o,
     input logic out_row_accept_i
 );
 
     // BUFFER LOGIC
-    // First kernal needs kernal_height tap, each subsequent kernal requires STRIDE rows beyond that
-    //parameter BUFFER_HEIGHT = KERNAL_SIZE + (NUM_KERNALS-1)*STRIDE;
     
     logic buffer_shift_horiz, buffer_shift_vert;
     logic [ VALUE_BITS-1 : 0 ] buffer_taps[NUM_KERNALS][IN_CHANNELS][KERNAL_SIZE][KERNAL_SIZE];
@@ -156,7 +151,7 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS
     e_state state_q; // for what mode we are in
     logic [7 : 0] row_idx_q; // what row number is the next row we shift in
     logic [7 : 0] col_idx_q; // what column is at zero (aka, how many times have we shifted
-    logic [VALUE_BITS -1 : 0] out_row_q[WIDTH/STRIDE][OUT_CHANNELS];
+    logic [VALUE_BITS -1 : 0] out_row_q[WIDTH][OUT_CHANNELS];
     logic out_row_valid_q;
     logic out_row_last_q;
 
@@ -169,7 +164,7 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS
     e_state next_state;
     logic [7 : 0] next_row_idx;
     logic [7 : 0] next_col_idx;
-    logic [VALUE_BITS -1 : 0] next_out_row[WIDTH/STRIDE][OUT_CHANNELS];
+    logic [VALUE_BITS -1 : 0] next_out_row[WIDTH][OUT_CHANNELS];
     logic next_out_row_valid;
     logic next_out_row_last;
 
