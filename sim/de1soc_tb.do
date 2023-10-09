@@ -3,6 +3,7 @@ vlog *.sv
 
 vsim de1soc_tb
 
+add wave dut/*
 add wave dut/layer0/* 
 add wave dut/layer0/in_row_i
 add wave dut/layer0/buffer_taps

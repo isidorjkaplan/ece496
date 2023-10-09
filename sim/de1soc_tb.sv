@@ -107,6 +107,12 @@ module de1soc_tb();
                 read_values(28);
             end
         end
+        // Should fail forever
+        //read_values(1);
+        
+        for (int i = 0; i < 1000; i++) begin
+            @(posedge clock);
+        end
         $stop();
     end
 endmodule 

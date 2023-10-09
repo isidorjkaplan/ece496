@@ -15,13 +15,13 @@ module cnn_top(
     output logic upstream_stall
 );    
     parameter VALUE_BITS=8;
-    parameter WEIGHT_BITS=16;
-    parameter WEIGHT_Q_SHIFT=8;
+    parameter WEIGHT_BITS=8;
+    parameter WEIGHT_Q_SHIFT=6;
     parameter KERNAL_SIZE=3;
     parameter WIDTH=28;
     parameter IN_CHANNELS=1;
-    parameter OUT_CHANNELS=3;
-    parameter NUM_KERNALS=2;
+    parameter OUT_CHANNELS=1;
+    parameter NUM_KERNALS=1;
     parameter STRIDE=1;
 
     logic  [ WEIGHT_BITS-1 : 0 ] kernal_weights_i[OUT_CHANNELS][IN_CHANNELS][KERNAL_SIZE][KERNAL_SIZE];

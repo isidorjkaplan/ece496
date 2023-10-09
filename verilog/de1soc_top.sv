@@ -85,7 +85,7 @@ module serialize #(parameter N, DATA_BITS=32) (
             data_buffer <= in_data;
             buffer_valid <= 1;
         end 
-        else if (!downstream_stall) begin
+        else if (!downstream_stall && buffer_valid) begin
             word_idx <= (word_idx + 1);
             if (word_idx == N-1) begin
                 word_idx <= 0;
