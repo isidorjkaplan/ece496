@@ -37,7 +37,7 @@ module cnn_top(
         .clock_i(clock), .reset_i(reset),
         // INPUT INFO
         .in_row_i(in_row_i),
-        .in_row_valid_i(iin_row_valid_i),
+        .in_row_valid_i(in_row_valid_i),
         .in_row_accept_o(in_row_accept_o),
         .in_row_last_i(in_row_last_i),
         // OUT INFO
