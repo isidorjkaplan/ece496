@@ -28,7 +28,8 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS
     // next row logic
     input logic [VALUE_BITS - 1 : 0] in_row_i[WIDTH][IN_CHANNELS], 
     input logic in_row_valid_i, 
-    output logic in_row_ready_o, 
+    output logic in_row_accept_o, // must be high before in_row_i moves to next value
+    input logic in_row_last_i,  // if raised we are done
     // output row valid 
     output logic [VALUE_BITS -1 : 0] out_row_o[WIDTH/STRIDE][OUT_CHANNELS],
     output logic out_row_valid_o,
@@ -36,15 +37,11 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS
 );
 
     // BUFFER LOGIC
-
     // First kernal needs kernal_height tap, each subsequent kernal requires STRIDE rows beyond that
     //parameter BUFFER_HEIGHT = KERNAL_SIZE + (NUM_KERNALS-1)*STRIDE;
     
     logic buffer_shift_horiz, buffer_shift_vert;
     logic [ VALUE_BITS-1 : 0 ] buffer_taps[NUM_KERNALS][IN_CHANNELS][KERNAL_SIZE][KERNAL_SIZE];
-
-    assign buffer_shift_vert = in_row_valid_i;
-    assign buffer_shift_horiz = 1;
 
     shift_buffer_array #(.WIDTH(WIDTH), .HEIGHT(KERNAL_SIZE), .TAP_WIDTH(KERNAL_SIZE), .NUM_TAPS(NUM_KERNALS), .VALUE_BITS(VALUE_BITS), .NUM_CHANNELS(IN_CHANNELS)) buffer(
         .clock_i(clock_i), .reset_i(reset_i), 
@@ -56,6 +53,74 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS
     // KERNAL LOGIC
     // TODO
 
+    // BUFFER CONTROL FSM
+    typedef enum {S_GET_INITIAL_ROWS, S_CALC_ROW, S_GET_NEXT_ROW} e_state;
+
+    // buffer registers
+    e_state state_q; // for what mode we are in
+    logic [7 : 0] row_idx_q; // what row number is the next row we shift in
+    logic [7 : 0] col_idx_q; // what column is at zero (aka, how many times have we shifted)
+
+    // buffer signals
+    e_state next_state;
+    logic [7 : 0] next_row_idx;
+    logic [7 : 0] next_col_idx;
+
+    // Buffer combinational FSM logic
+    always_comb begin
+        next_state = state_q;
+        next_row_idx = row_idx_q;
+        next_col_idx = col_idx_q;
+        buffer_shift_horiz = 0;
+        buffer_shift_vert = 0;
+        in_row_accept_o = 0;
+        case (state_q) 
+        S_GET_INITIAL_ROWS: begin
+            if (in_row_valid_i) begin
+                // latch this row and increment row index
+                next_row_idx = row_idx_q + 1;
+                buffer_shift_vert = 1;
+                in_row_accept_o = 1; 
+                if (next_row_idx == KERNAL_SIZE) begin
+                    next_state = S_CALC_ROW;
+                    next_col_idx = 0;
+                end
+            end
+        end
+        S_CALC_ROW: begin
+            // TODO assuming can produce an output of the kernal each itteration; probably gonna have to stall here
+            buffer_shift_horiz = 1;
+            next_col_idx = col_idx_q + 1;
+            if (next_col_idx == WIDTH) begin
+                next_state = S_GET_NEXT_ROW;
+            end
+        end
+        S_GET_NEXT_ROW: begin
+            if (in_row_valid_i) begin
+                // Get the next row
+                buffer_shift_vert = 1;
+                in_row_accept_o = 1;
+                next_row_idx = row_idx_q + 1;
+                // Change state to be calculating over that row
+                next_state = S_CALC_ROW;
+                next_col_idx = 0;
+            end
+        end
+        endcase
+    end
+
+    // Buffer sequential logic
+    always_ff@(posedge clock_i) begin
+        if (reset_i) begin
+            state_q <= S_GET_INITIAL_ROWS;
+            row_idx_q <= 0;
+            col_idx_q <= 0;
+        end else begin
+            state_q <= next_state;
+            row_idx_q <= next_row_idx;
+            col_idx_q <= next_col_idx;
+        end
+    end
 
 endmodule 
 
@@ -106,31 +171,6 @@ endmodule
 
 
 /*
-// An array of multiple stamped instances of the kernals
-module kernal_array #(parameter 
-    KERNAL_SIZE, NUM_KERNALS,
-    BUFFER_HEIGHT
-    WEIGHT_BITS=16, WEIGHT_Q_SHIFT=8,
-    VALUE_BITS, IN_CHANNELS, OUT_CHANNELS
-) (
-    input clock, 
-    input reset,
-    input in_valid, 
-    input out_valid, 
-    input logic  [ WEIGHT_BITS-1 : 0 ] kernal_weights[KERNAL_SIZE][KERNAL_SIZE][OUT_CHANNELS],
-    input logic  [ VALUE_BITS-1  : 0 ] image_values[BUFFER_HEIGHT][KERNAL_SIZE][IN_CHANNELS],
-    output logic [ VALUE_BITS-1  : 0 ] output_value[NUM_KERNALS][OUT_CHANNELS],
-);;
-       logic [ VALUE_BITS -1 : 0] kernal_outputs[NUM_KERNALS][NUM_CHANNELS];
-
-    genvar i;
-    generate 
-        for (i = 0; i < NUM_KERNALS; i++) begin
-            kernal #(KERNAL_SIZE=KERNAL_SIZE, VALUE_BITS=VALUE_BITS, ) kern();
-        end
-    endgenerate 
-endmodule
-
 // Takes input image of size KERNAL_SIZE*KERNAL_SIZE*NUM_CHANNELS and produces identical output
 // Kernal weights and image values are in fixed-point format 
 module kernal #(parameter KERNAL_SIZE, 

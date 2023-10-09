@@ -28,16 +28,33 @@ module de1soc_tb();
         // INPUT INFO
         .in_row_i(in_row_layer0),
         .in_row_valid_i(in_row_layer0_valid),
-        .in_row_ready_o(layer0_in_ready)
+        .in_row_accept_o(layer0_in_ready)
         // Don't even bother hooking up output info right now
         // TODO
     );
 
     assign #5 clock = ~clock & !clk_reset;
-
+    
+    task automatic write_row(int row_num);
+    begin
+        for (int width = 0; width < LAYER0_WIDTH; width++) begin
+            for (int in_ch = 0; in_ch < LAYER0_IN_CHANNELS; in_ch++) begin
+                in_row_layer0[width][in_ch] = width + in_ch +  LAYER0_WIDTH*LAYER0_IN_CHANNELS*row_num;
+            end
+        end
+        in_row_layer0_valid = 1;
+        #1
+        while (!layer0_in_ready) begin
+            @(posedge clock);
+        end
+        @(posedge clock);
+        in_row_layer0_valid = 0;
+    end
+    endtask
     //cnn_top tb(clock, reset, in_data, in_valid, out_data, out_valid, downstream_stall, upstream_stall);
     
     initial begin
+        in_row_layer0_valid = 0;
         clk_reset = 1;
         reset = 1;
         #6
@@ -49,30 +66,10 @@ module de1soc_tb();
         @(posedge clock);
         reset = 0;
         @(posedge clock);
-        in_row_layer0_valid = 1;
 
-
-        for (int width = 0; width < LAYER0_WIDTH; width++) begin
-            for (int in_ch = 0; in_ch < LAYER0_IN_CHANNELS; in_ch++) begin
-                in_row_layer0[width][in_ch] = width+in_ch;
-            end
+        for (int i = 0; i < 28; i++) begin
+            write_row(i);
         end
-        @(posedge clock);
-        for (int width = 0; width < LAYER0_WIDTH; width++) begin
-            for (int in_ch = 0; in_ch < LAYER0_IN_CHANNELS; in_ch++) begin
-                in_row_layer0[width][in_ch] = in_row_layer0[width][in_ch] + LAYER0_WIDTH*LAYER0_IN_CHANNELS;
-            end
-        end
-        @(posedge clock);
-        for (int width = 0; width < LAYER0_WIDTH; width++) begin
-            for (int in_ch = 0; in_ch < LAYER0_IN_CHANNELS; in_ch++) begin
-                in_row_layer0[width][in_ch] = in_row_layer0[width][in_ch] + LAYER0_WIDTH*LAYER0_IN_CHANNELS;
-            end
-        end
-        @(posedge clock);
-
-        
-        in_row_layer0_valid = 0;
 
         for (int i = 0; i < 1000; i++) begin
             @(posedge clock);
