@@ -49,15 +49,29 @@ module de1soc_tb();
         @(posedge clock);
         reset = 0;
         @(posedge clock);
-        for (int width = 0; width < 28; width++) begin
+        in_row_layer0_valid = 1;
+
+
+        for (int width = 0; width < LAYER0_WIDTH; width++) begin
             for (int in_ch = 0; in_ch < LAYER0_IN_CHANNELS; in_ch++) begin
                 in_row_layer0[width][in_ch] = width+in_ch;
             end
         end
-        in_row_layer0_valid = 1;
         @(posedge clock);
+        for (int width = 0; width < LAYER0_WIDTH; width++) begin
+            for (int in_ch = 0; in_ch < LAYER0_IN_CHANNELS; in_ch++) begin
+                in_row_layer0[width][in_ch] = in_row_layer0[width][in_ch] + LAYER0_WIDTH*LAYER0_IN_CHANNELS;
+            end
+        end
         @(posedge clock);
+        for (int width = 0; width < LAYER0_WIDTH; width++) begin
+            for (int in_ch = 0; in_ch < LAYER0_IN_CHANNELS; in_ch++) begin
+                in_row_layer0[width][in_ch] = in_row_layer0[width][in_ch] + LAYER0_WIDTH*LAYER0_IN_CHANNELS;
+            end
+        end
         @(posedge clock);
+
+        
         in_row_layer0_valid = 0;
 
         for (int i = 0; i < 1000; i++) begin

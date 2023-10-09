@@ -73,6 +73,7 @@ module shift_buffer_array #(parameter WIDTH, HEIGHT, TAP_WIDTH, NUM_TAPS, VALUE_
 
     logic [VALUE_BITS - 1 : 0] buffer[HEIGHT][WIDTH][NUM_CHANNELS];
 
+    // Output taps
     always_comb begin
         for (int num_tap = 0; num_tap < NUM_TAPS; num_tap++) begin
             for (int ch_num = 0; ch_num < NUM_CHANNELS; ch_num++) begin
@@ -85,7 +86,7 @@ module shift_buffer_array #(parameter WIDTH, HEIGHT, TAP_WIDTH, NUM_TAPS, VALUE_
             end
         end
     end
-    
+    // State update to the buffer
     always_ff@(posedge clock_i) begin
         if (shift_vert_i) begin
             for (int row = 1; row < HEIGHT; row++) begin
@@ -93,10 +94,11 @@ module shift_buffer_array #(parameter WIDTH, HEIGHT, TAP_WIDTH, NUM_TAPS, VALUE_
             end
             buffer[0] <= next_row_i;
         end else if (shift_horiz_i) begin
-            for (int col = 1; col < WIDTH; col++) begin
-                for (int row = 0; row < HEIGHT; row++) begin
+            for (int row = 0; row < HEIGHT; row++) begin
+                for (int col = 1; col < WIDTH; col++) begin
                     buffer[row][col] <= buffer[row][col-1];
                 end
+                buffer[row][0] <= buffer[row][WIDTH-1];
             end
         end
     end
