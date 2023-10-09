@@ -16,31 +16,7 @@ module cnn_top(
 );
     assign upstream_stall = 0;
 
-    parameter VALUE_BITS=8;
-    parameter KERNAL_SIZE=3;
-    parameter LAYER0_WIDTH=28;
-    parameter LAYER0_IN_CHANNELS=1;
-    parameter LAYER0_OUT_CHANNELS=2;
-    parameter LAYER0_NUM_KERNALS=1;
-    parameter LAYER0_STRIDE=1;
-
-    logic [VALUE_BITS-1 : 0] in_row_layer0[LAYER0_WIDTH][LAYER0_IN_CHANNELS];
-    logic [$clog2(LAYER0_WIDTH)-1 : 0] in_row_idx;
-    logic layer0_in_ready;
-
-    cnn_layer #(
-        .KERNAL_SIZE(KERNAL_SIZE), .NUM_KERNALS(LAYER0_NUM_KERNALS), .STRIDE(LAYER0_STRIDE), 
-        .WIDTH(LAYER0_WIDTH), .VALUE_BITS(VALUE_BITS), .IN_CHANNELS(LAYER0_IN_CHANNELS), .OUT_CHANNELS(LAYER0_OUT_CHANNELS)
-    ) layer0(
-        // General
-        .clock_i(clock), .reset_i(reset),
-        // INPUT INFO
-        .in_row_i(in_row_layer0),
-        .in_row_valid_i(in_row_idx == LAYER0_WIDTH),
-        .in_row_ready_o(layer0_in_ready)
-        // Don't even bother hooking up output info right now
-        // TODO
-    );
+    // TODO
 
     
 endmodule 
@@ -62,14 +38,17 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS
     // BUFFER LOGIC
 
     // First kernal needs kernal_height tap, each subsequent kernal requires STRIDE rows beyond that
-    parameter BUFFER_HEIGHT = KERNAL_SIZE + (NUM_KERNALS-1)*STRIDE;
+    //parameter BUFFER_HEIGHT = KERNAL_SIZE + (NUM_KERNALS-1)*STRIDE;
     
     logic buffer_shift_horiz, buffer_shift_vert;
-    logic [ VALUE_BITS-1 : 0 ] buffer_taps[IN_CHANNELS][KERNAL_SIZE][BUFFER_HEIGHT];
+    logic [ VALUE_BITS-1 : 0 ] buffer_taps[NUM_KERNALS][IN_CHANNELS][KERNAL_SIZE][KERNAL_SIZE];
 
-    shift_buffer_array #(.WIDTH(WIDTH), .HEIGHT(BUFFER_HEIGHT), .NUM_TAPS(KERNAL_SIZE), .VALUE_BITS(VALUE_BITS), .NUM_CHANNELS(IN_CHANNELS)) buffer(
+    assign buffer_shift_vert = in_row_valid_i;
+    assign buffer_shift_horiz = 1;
+
+    shift_buffer_array #(.WIDTH(WIDTH), .HEIGHT(KERNAL_SIZE), .TAP_WIDTH(KERNAL_SIZE), .NUM_TAPS(NUM_KERNALS), .VALUE_BITS(VALUE_BITS), .NUM_CHANNELS(IN_CHANNELS)) buffer(
         .clock_i(clock_i), .reset_i(reset_i), 
-        .next_row_i(in_row_i), .next_row_valid_i(in_row_valid_i),
+        .next_row_i(in_row_i),
         .shift_horiz_i(buffer_shift_horiz), .shift_vert_i(buffer_shift_vert), 
         .taps_o(buffer_taps)
     );
@@ -80,19 +59,47 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS
 
 endmodule 
 
-module shift_buffer_array #(parameter WIDTH, HEIGHT, NUM_TAPS, VALUE_BITS, NUM_CHANNELS) 
+module shift_buffer_array #(parameter WIDTH, HEIGHT, TAP_WIDTH, NUM_TAPS, VALUE_BITS, NUM_CHANNELS) 
 (
     input clock_i, input reset_i,
     // next row logic
     input logic [VALUE_BITS - 1 : 0] next_row_i[WIDTH][NUM_CHANNELS], 
-    input logic next_row_valid_i, 
     // controls
     input logic shift_horiz_i, // shift over left
     input logic shift_vert_i, // shift entire row up
     // outputs
-    output logic [VALUE_BITS - 1 : 0] taps_o[NUM_CHANNELS][NUM_TAPS][HEIGHT]
+    output logic [VALUE_BITS - 1 : 0] taps_o[NUM_TAPS][NUM_CHANNELS][TAP_WIDTH][HEIGHT]
 );
-    //TODO
+
+    logic [VALUE_BITS - 1 : 0] buffer[HEIGHT][WIDTH][NUM_CHANNELS];
+
+    always_comb begin
+        for (int num_tap = 0; num_tap < NUM_TAPS; num_tap++) begin
+            for (int ch_num = 0; ch_num < NUM_CHANNELS; ch_num++) begin
+                for (int tap_width = 0; tap_width < TAP_WIDTH; tap_width++) begin
+                    for (int tap_height = 0; tap_height < HEIGHT; tap_height++) begin
+                        // TODO add in num_tap into width offset instead of just tapping offset relative to start
+                        taps_o[ num_tap ][ ch_num ][ tap_width ][ tap_height ] = buffer[ ((num_tap*WIDTH)/NUM_TAPS) + tap_width ][ tap_height ][ ch_num ];
+                    end
+                end
+            end
+        end
+    end
+    
+    always_ff@(posedge clock_i) begin
+        if (shift_vert_i) begin
+            for (int row = 1; row < HEIGHT; row++) begin
+                buffer[row] <= buffer[row-1];
+            end
+            buffer[0] <= next_row_i;
+        end else if (shift_horiz_i) begin
+            for (int col = 1; col < WIDTH; col++) begin
+                for (int row = 0; row < HEIGHT; row++) begin
+                    buffer[row][col] <= buffer[row][col-1];
+                end
+            end
+        end
+    end
 endmodule 
 
 
