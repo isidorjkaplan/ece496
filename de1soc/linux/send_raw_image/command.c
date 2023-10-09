@@ -154,15 +154,17 @@ int main (int argc, char *argv[])
 		read_count++;
 	}
 
-	printf("Flushed FIFO read queue with %d elements", read_count);
+	printf("Flushed FIFO read queue with %d elements\n", read_count);
 
-	for (int y = 0; y < 28; y++) {
-		for (int x = 0; x < 28; x++) {
+	int x, y;
+
+	for (y = 0; y < 28; y++) {
+		for (x = 0; x < 28; x++) {
 			FIFO_WRITE_BLOCK(x + 28*y);
 		}
 		printf("Wrote row=%d", y);
 		if (y >= 2) {
-			for (int x = 0; x < 28; x++) {
+			for (x = 0; x < 28; x++) {
 				while (!READ_FIFO_EMPTY) {
 					x++;
 				}
