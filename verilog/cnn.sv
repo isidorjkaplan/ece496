@@ -294,10 +294,10 @@ module shift_buffer_array #(parameter WIDTH, HEIGHT, TAP_WIDTH, NUM_TAPS, VALUE_
             buffer[0] <= next_row_i;
         end else if (shift_horiz_i) begin
             for (int row = 0; row < HEIGHT; row++) begin
-                for (int col = 1; col < WIDTH; col++) begin
-                    buffer[row][col] <= buffer[row][col-1];
+                for (int col = 0; col < WIDTH-1; col++) begin
+                    buffer[row][col] <= buffer[row][col+1];
                 end
-                buffer[row][0] <= buffer[row][WIDTH-1];
+                buffer[row][WIDTH-1] <= buffer[row][0];
             end
         end
     end
