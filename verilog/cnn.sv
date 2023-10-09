@@ -14,46 +14,15 @@ module cnn_top(
     input wire downstream_stall,
     output wire upstream_stall
 );    
-    parameter VALUE_BITS=8;
-    parameter KERNAL_SIZE=3;
-    parameter WIDTH=28;
-    parameter IN_CHANNELS=1;
-    parameter OUT_CHANNELS=2;
-    parameter NUM_KERNALS=1;
-    parameter STRIDE=1;
-
-    logic [VALUE_BITS-1 : 0] in_row_i[WIDTH][IN_CHANNELS];
-    logic in_row_valid_i, in_row_accept_o, in_row_last_i;
-
-    logic [VALUE_BITS -1 : 0] out_row_o[WIDTH/STRIDE][OUT_CHANNELS];
-    logic out_row_valid_o;
-    logic out_row_accept_i;
-
-    cnn_layer #(
-        .KERNAL_SIZE(KERNAL_SIZE), .NUM_KERNALS(NUM_KERNALS), .STRIDE(STRIDE), 
-        .WIDTH(WIDTH), .VALUE_BITS(VALUE_BITS), .IN_CHANNELS(IN_CHANNELS), .OUT_CHANNELS(OUT_CHANNELS)
-    ) layer0(
-        // General
-        .clock_i(clock), .reset_i(reset),
-        // INPUT INFO
-        .in_row_i(in_row_i),
-        .in_row_valid_i(in_row_valid_i),
-        .in_row_accept_o(in_row_accept_o),
-        .in_row_last_i(in_row_last_i),
-        // OUT INFO
-        .out_row_o(out_row_o),
-        .out_row_valid_o(out_row_valid_o),
-        .out_row_accept_i(out_row_accept_i)
-    );
-    // To make sure it does not get optimized away
-    assign upstream_stall = 0;
-    assign out_valid = out_row_valid_o;
+    //TODO
 endmodule 
 
 
-module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS, IN_CHANNELS, OUT_CHANNELS) (
+module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS, WEIGHT_BITS, WEIGHT_Q_SHIFT, IN_CHANNELS, OUT_CHANNELS) (
     // General signals
     input clock_i, input reset_i,
+    // Constant but dynamic layer config
+    input logic [ WEIGHT_BITS-1 : 0 ] kernal_weights_i[OUT_CHANNELS][IN_CHANNELS][KERNAL_SIZE][KERNAL_SIZE],
     // next row logic
     input logic [VALUE_BITS - 1 : 0] in_row_i[WIDTH][IN_CHANNELS], 
     input logic in_row_valid_i, 
@@ -62,6 +31,7 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS
     // output row valid 
     output logic [VALUE_BITS -1 : 0] out_row_o[WIDTH/STRIDE][OUT_CHANNELS],
     output logic out_row_valid_o,
+    output logic out_row_last_o,
     input logic out_row_accept_i
 );
 
@@ -80,53 +50,96 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS
     );
 
     // KERNAL LOGIC
-    // TODO
+    logic [ VALUE_BITS-1 : 0 ] kernal_arr_output [NUM_KERNALS][OUT_CHANNELS];
+
+    kernal_array #(
+        .KERNAL_SIZE(KERNAL_SIZE), .NUM_KERNALS(NUM_KERNALS),
+        .WEIGHT_BITS(WEIGHT_BITS), .WEIGHT_Q_SHIFT(WEIGHT_Q_SHIFT),
+        .VALUE_BITS(VALUE_BITS),
+        .IN_CHANNELS(IN_CHANNELS), .OUT_CHANNELS(OUT_CHANNELS)
+    ) kernals(
+        .clock_i(clock_i), .reset_i(reset_i), 
+        .kernal_weights_i(kernal_weights_i), .image_values_i(buffer_taps), 
+        .output_values_o(kernal_arr_output)
+    );
 
     // BUFFER CONTROL FSM
-    typedef enum {S_CALC_ROW, S_GET_NEXT_ROW} e_state;
+    typedef enum {S_GET_NEXT_ROW, S_CALC_ROW, S_WAIT_ROW_READ} e_state;
 
     // buffer registers
     e_state state_q; // for what mode we are in
     logic [7 : 0] row_idx_q; // what row number is the next row we shift in
-    logic [7 : 0] col_idx_q; // what column is at zero (aka, how many times have we shifted)
+    logic [7 : 0] col_idx_q; // what column is at zero (aka, how many times have we shifted
+    logic [VALUE_BITS -1 : 0] out_row_q[WIDTH/STRIDE][OUT_CHANNELS];
+    logic out_row_valid_q;
+    logic out_row_last_q;
+
+    // For simple output ports
+    assign out_row_o = out_row_q;
+    assign out_row_valid_o = out_row_valid_q;
+    assign out_row_last_o = out_row_last_q;
 
     // buffer signals
     e_state next_state;
     logic [7 : 0] next_row_idx;
     logic [7 : 0] next_col_idx;
+    logic [VALUE_BITS -1 : 0] next_out_row[WIDTH/STRIDE][OUT_CHANNELS];
+    logic next_out_row_valid;
+    logic next_out_row_last;
 
     // Buffer combinational FSM logic
     always_comb begin
         next_state = state_q;
         next_row_idx = row_idx_q;
         next_col_idx = col_idx_q;
+        next_out_row = out_row_q;
+        next_out_row_valid = out_row_valid_q;
+        next_out_row_last = out_row_last_q;
         buffer_shift_horiz = 0;
         buffer_shift_vert = 0;
         in_row_accept_o = 0;
         case (state_q) 
-        S_CALC_ROW: begin
-            // TODO assuming can produce an output of the kernal each itteration; probably gonna have to stall here
-            buffer_shift_horiz = 1;
-            next_col_idx = col_idx_q + 1;
-            if (next_col_idx == WIDTH) begin
-                next_state = S_GET_NEXT_ROW;
-            end
-        end
         S_GET_NEXT_ROW: begin
             if (in_row_valid_i) begin
                 // Get the next row
                 buffer_shift_vert = 1;
-                in_row_accept_o = 1;
                 next_row_idx = row_idx_q + 1;
-                //if this is the last row so after we are starting next image
-                if (in_row_last_i) begin
-                    next_row_idx = 0; 
-                end
                 // Change state to be calculating over that row
                 if (next_row_idx >= KERNAL_SIZE) begin
                     next_state = S_CALC_ROW;
                     next_col_idx = 0;
                 end
+                else begin
+                    in_row_accept_o = 1;
+                end
+            end
+        end
+        S_CALC_ROW: begin
+            // TODO assuming can produce an output of the kernal each itteration; probably gonna have to stall here
+            buffer_shift_horiz = 1;
+            next_col_idx = col_idx_q + 1;
+            
+            for (int kernal_num = 0; kernal_num < NUM_KERNALS; kernal_num++) begin
+                next_out_row[ (kernal_num*WIDTH/NUM_KERNALS) +  col_idx_q ] = kernal_arr_output[kernal_num];
+            end
+
+            if (next_col_idx*NUM_KERNALS >= WIDTH) begin
+                next_state = S_WAIT_ROW_READ;
+                next_out_row_valid = 1;
+                // Accept the row read; the input can now put a new value on its input port
+                in_row_accept_o = 1;
+                //if this is the last row so after we are starting next image
+                if (in_row_last_i) begin
+                    next_row_idx = 0; 
+                    next_out_row_last = 1;
+                end
+            end
+        end
+        S_WAIT_ROW_READ: begin
+            if (out_row_accept_i) begin
+                next_state = S_GET_NEXT_ROW;
+                next_out_row_valid = 0;
+                next_out_row_last = 0;
             end
         end
         endcase
@@ -138,10 +151,15 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS
             state_q <= S_GET_NEXT_ROW;
             row_idx_q <= 0;
             col_idx_q <= 0;
+            out_row_valid_q <= 0;
+            out_row_last_q <= 0;
         end else begin
             state_q <= next_state;
             row_idx_q <= next_row_idx;
             col_idx_q <= next_col_idx;
+            out_row_q <= next_out_row;
+            out_row_valid_q <= next_out_row_valid;
+            out_row_last_q <= next_out_row_last;
         end
     end
 
@@ -195,20 +213,45 @@ module shift_buffer_array #(parameter WIDTH, HEIGHT, TAP_WIDTH, NUM_TAPS, VALUE_
 endmodule 
 
 
-/*
 // Takes input image of size KERNAL_SIZE*KERNAL_SIZE*NUM_CHANNELS and produces identical output
 // Kernal weights and image values are in fixed-point format 
-module kernal #(parameter KERNAL_SIZE, 
-    WEIGHT_BITS=16, WEIGHT_Q_SHIFT=8,
+module kernal_array #(parameter KERNAL_SIZE, NUM_KERNALS,
+    WEIGHT_BITS, WEIGHT_Q_SHIFT,
     VALUE_BITS, IN_CHANNELS, OUT_CHANNELS
 ) (
-    input clock, 
-    input reset,
-    input in_valid, 
-    input out_valid, 
-    input logic  [ WEIGHT_BITS-1 : 0 ] kernal_weights[KERNAL_SIZE][KERNAL_SIZE][OUT_CHANNELS],
-    input logic  [ VALUE_BITS-1  : 0 ] image_values[KERNAL_SIZE][KERNAL_SIZE][IN_CHANNELS],
-    output logic [ VALUE_BITS-1  : 0 ] output_value[OUT_CHANNELS],
+    input clock_i, 
+    input reset_i,
+    // The weights for the kernal
+    input logic  [ WEIGHT_BITS-1: 0 ] kernal_weights_i[OUT_CHANNELS][IN_CHANNELS][KERNAL_SIZE][KERNAL_SIZE],
+    // The image values for each of the stamped kernals
+    input logic  [ VALUE_BITS-1 : 0 ] image_values_i  [NUM_KERNALS][IN_CHANNELS] [KERNAL_SIZE][KERNAL_SIZE],
+    // The output values for each of the stamped kernals, comes on the clock-edge after inputs provided
+    output logic [ VALUE_BITS-1 : 0 ] output_values_o  [NUM_KERNALS][OUT_CHANNELS]
 );
+    logic [ VALUE_BITS-1 : 0 ] comb_values  [NUM_KERNALS][OUT_CHANNELS];
+    // TODO pipeline this and add out_valid signal instead of just combinational logic
+    always_comb begin
+        for (int kernal_num = 0; kernal_num < NUM_KERNALS; kernal_num++) begin
+            for (int out_ch = 0; out_ch < OUT_CHANNELS; out_ch++) begin
+                // We are assigning output_values_o[kernal][channel] here
+                comb_values[kernal_num][out_ch] = 0;
+                // Take dot product of kernal_weights[out_channel] with image_values_i[kernal_num]
+                for (int in_ch = 0; in_ch < IN_CHANNELS; in_ch++) begin
+                    for (int x = 0; x < KERNAL_SIZE; x++) begin
+                        for (int y = 0; y < KERNAL_SIZE; y++) begin
+                            // Do fixed-point multiplication of the two scalar values
+                            comb_values[kernal_num][out_ch] += 
+                                (kernal_weights_i[out_ch][in_ch][x][y] 
+                                * image_values_i[kernal_num][in_ch][x][y])
+                                >> WEIGHT_Q_SHIFT;
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    always_ff@(posedge clock_i) begin
+        output_values_o <= comb_values;
+    end
 endmodule 
-*/
