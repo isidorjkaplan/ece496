@@ -46,7 +46,7 @@ module parallelize #(parameter N, DATA_BITS, DATA_PER_WORD, WORD_SIZE=32) (
             for (int data_num = 0; data_num < DATA_PER_WORD; data_num++) begin
                 if (data_idx + data_num < N) begin
                     data_buffer[data_idx + data_num] 
-                    <= in_data[ DATA_BITS-1+data_num*DATA_BITS : 0+data_num*DATA_BITS ];
+                    <= in_data[ data_num*DATA_BITS +: DATA_BITS ];
                 end
             end
         end
@@ -103,9 +103,10 @@ module serialize #(parameter N, DATA_BITS, DATA_PER_WORD, WORD_SIZE=32) (
     assign out_valid = buffer_valid;
 
     always_comb begin
+        out_data = 0;
         for (int data_num = 0; data_num < DATA_PER_WORD; data_num++) begin
             if (data_idx + data_num < N) begin
-                out_data[ DATA_BITS-1+data_num*DATA_BITS : 0+data_num*DATA_BITS ] = data_buffer[data_idx + data_num];
+                out_data[ data_num*DATA_BITS +: DATA_BITS ] = data_buffer[data_idx + data_num];
             end
         end
     end
