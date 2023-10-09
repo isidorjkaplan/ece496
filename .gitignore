@@ -31,11 +31,11 @@
 */c5_pin_model_dump.txt
 */hps_isw_handoff
 */hps_sdram_p0_summary.csv
-
 *.db_info
 *.rdb
 *.nfs.*
 sim/.nfs*
+sim/transcript
 
 # ignore Quartus II generated files
 *_generation_script*
