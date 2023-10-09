@@ -145,7 +145,12 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS
     );
 
     // BUFFER CONTROL FSM
-    typedef enum {S_GET_NEXT_ROW, S_CALC_ROW, S_WAIT_ROW_READ} e_state;
+    typedef enum {
+        S_GET_NEXT_ROW, 
+        S_CALC_ROW_WAIT, 
+        S_CALC_ROW, 
+        S_WAIT_ROW_READ
+    } e_state;
 
     // buffer registers
     e_state state_q; // for what mode we are in
@@ -187,7 +192,7 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS
                 next_row_idx = row_idx_q + 1;
                 // Change state to be calculating over that row
                 if (next_row_idx >= KERNAL_SIZE) begin
-                    next_state = S_CALC_ROW;
+                    next_state = S_CALC_ROW_WAIT;
                     next_col_idx = 0;
                 end
                 else begin
@@ -195,10 +200,15 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS
                 end
             end
         end
+        S_CALC_ROW_WAIT: begin
+            // We need to wait one cycle for kernal output to update
+            next_state = S_CALC_ROW;
+        end
         S_CALC_ROW: begin
             // TODO assuming can produce an output of the kernal each itteration; probably gonna have to stall here
             buffer_shift_horiz = 1;
             next_col_idx = col_idx_q + 1;
+            next_state = S_CALC_ROW_WAIT; // wait for kernal output to reflect this change
             
             for (int kernal_num = 0; kernal_num < NUM_KERNALS; kernal_num++) begin
                 next_out_row[ (kernal_num*WIDTH/NUM_KERNALS) +  col_idx_q ] = kernal_arr_output[kernal_num];
