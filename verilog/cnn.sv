@@ -54,7 +54,7 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS
     // TODO
 
     // BUFFER CONTROL FSM
-    typedef enum {S_GET_INITIAL_ROWS, S_CALC_ROW, S_GET_NEXT_ROW} e_state;
+    typedef enum {S_CALC_ROW, S_GET_NEXT_ROW} e_state;
 
     // buffer registers
     e_state state_q; // for what mode we are in
@@ -75,18 +75,6 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS
         buffer_shift_vert = 0;
         in_row_accept_o = 0;
         case (state_q) 
-        S_GET_INITIAL_ROWS: begin
-            if (in_row_valid_i) begin
-                // latch this row and increment row index
-                next_row_idx = row_idx_q + 1;
-                buffer_shift_vert = 1;
-                in_row_accept_o = 1; 
-                if (next_row_idx == KERNAL_SIZE) begin
-                    next_state = S_CALC_ROW;
-                    next_col_idx = 0;
-                end
-            end
-        end
         S_CALC_ROW: begin
             // TODO assuming can produce an output of the kernal each itteration; probably gonna have to stall here
             buffer_shift_horiz = 1;
@@ -101,9 +89,15 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS
                 buffer_shift_vert = 1;
                 in_row_accept_o = 1;
                 next_row_idx = row_idx_q + 1;
+                //if this is the last row so after we are starting next image
+                if (in_row_last_i) begin
+                    next_row_idx = 0; 
+                end
                 // Change state to be calculating over that row
-                next_state = S_CALC_ROW;
-                next_col_idx = 0;
+                if (next_row_idx >= KERNAL_SIZE) begin
+                    next_state = S_CALC_ROW;
+                    next_col_idx = 0;
+                end
             end
         end
         endcase
@@ -112,7 +106,7 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, STRIDE, WIDTH, VALUE_BITS
     // Buffer sequential logic
     always_ff@(posedge clock_i) begin
         if (reset_i) begin
-            state_q <= S_GET_INITIAL_ROWS;
+            state_q <= S_GET_NEXT_ROW;
             row_idx_q <= 0;
             col_idx_q <= 0;
         end else begin

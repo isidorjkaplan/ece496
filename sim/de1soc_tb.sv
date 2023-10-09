@@ -17,7 +17,7 @@ module de1soc_tb();
     parameter LAYER0_STRIDE=1;
 
     logic [VALUE_BITS-1 : 0] in_row_layer0[LAYER0_WIDTH][LAYER0_IN_CHANNELS];
-    logic layer0_in_ready, in_row_layer0_valid;
+    logic layer0_in_ready, in_row_layer0_valid, layer0_last_row;
 
     cnn_layer #(
         .KERNAL_SIZE(KERNAL_SIZE), .NUM_KERNALS(LAYER0_NUM_KERNALS), .STRIDE(LAYER0_STRIDE), 
@@ -28,7 +28,8 @@ module de1soc_tb();
         // INPUT INFO
         .in_row_i(in_row_layer0),
         .in_row_valid_i(in_row_layer0_valid),
-        .in_row_accept_o(layer0_in_ready)
+        .in_row_accept_o(layer0_in_ready),
+        .in_row_last_i(layer0_last_row)
         // Don't even bother hooking up output info right now
         // TODO
     );
@@ -55,6 +56,7 @@ module de1soc_tb();
     
     initial begin
         in_row_layer0_valid = 0;
+        layer0_last_row = 0;
         clk_reset = 1;
         reset = 1;
         #6
@@ -67,9 +69,16 @@ module de1soc_tb();
         reset = 0;
         @(posedge clock);
 
-        for (int i = 0; i < 28; i++) begin
+        // Write the first 27 rows of the image
+        for (int i = 0; i < 27; i++) begin
             write_row(i);
         end
+        // Write the last row
+        layer0_last_row = 1;
+        write_row(27);
+        // turn off last signal
+        layer0_last_row = 0;
+
 
         for (int i = 0; i < 1000; i++) begin
             @(posedge clock);
