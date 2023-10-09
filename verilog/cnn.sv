@@ -14,7 +14,80 @@ module cnn_top(
     input wire downstream_stall,
     output wire upstream_stall
 );    
-    //TODO
+    parameter VALUE_BITS=8;
+    parameter WEIGHT_BITS=16;
+    parameter WEIGHT_Q_SHIFT=8;
+    parameter KERNAL_SIZE=3;
+    parameter WIDTH=28;
+    parameter IN_CHANNELS=1;
+    parameter OUT_CHANNELS=2;
+    parameter NUM_KERNALS=1;
+    parameter STRIDE=1;
+
+    logic  [ WEIGHT_BITS-1 : 0 ] kernal_weights_i[OUT_CHANNELS][IN_CHANNELS][KERNAL_SIZE][KERNAL_SIZE];
+
+    logic [VALUE_BITS-1 : 0] in_row_i[WIDTH][IN_CHANNELS];
+    logic in_row_valid_i, in_row_accept_o, in_row_last_i;
+    
+
+    logic [VALUE_BITS -1 : 0] out_row_o[WIDTH/STRIDE][OUT_CHANNELS];
+    logic out_row_valid_o;
+    logic out_row_accept_i;
+    logic out_row_last_o;
+
+    cnn_layer #(
+        .KERNAL_SIZE(KERNAL_SIZE), .NUM_KERNALS(NUM_KERNALS), .STRIDE(STRIDE), 
+        .WIDTH(WIDTH), .VALUE_BITS(VALUE_BITS), .WEIGHT_BITS(WEIGHT_BITS), .WEIGHT_Q_SHIFT(WEIGHT_Q_SHIFT), .IN_CHANNELS(IN_CHANNELS), .OUT_CHANNELS(OUT_CHANNELS)
+    ) layer0(
+        // General
+        .clock_i(clock), .reset_i(reset),
+        .kernal_weights_i(kernal_weights_i),
+        // INPUT INFO
+        .in_row_i(in_row_i),
+        .in_row_valid_i(in_row_valid_i),
+        .in_row_accept_o(in_row_accept_o),
+        .in_row_last_i(in_row_last_i),
+        // OUT INFO
+        .out_row_o(out_row_o),
+        .out_row_valid_o(out_row_valid_o),
+        .out_row_accept_i(out_row_accept_i),
+        .out_row_last_o(out_row_last_o)
+    );
+
+    // GLUE LOGIC TO MAKE SURE NEURAL NETWORK NOT OPTIMIZED AWAY FOR AREA/POWER/FMAX CALCULATIONS
+
+    logic [7:0] in_bytes[4];
+    assign in_bytes = '{in_data[31:24], in_data[23:16], in_data[15:8], in_data[7:0]};
+
+    always_comb begin
+        for (int x = 0; x < WIDTH; x++) begin
+            for (int in_ch = 0; in_ch < IN_CHANNELS; in_ch++) begin
+                in_row_i[x][in_ch] = in_bytes[(x%4)];
+            end
+        end
+        for (int out_ch = 0; out_ch < OUT_CHANNELS; out_ch++) begin
+            for (int in_ch = 0; in_ch < IN_CHANNELS; in_ch++) begin
+                for (int x = 0; x < KERNAL_SIZE; x++) begin
+                    for (int y = 0; y < KERNAL_SIZE; y++) begin
+                        kernal_weights_i[out_ch][in_ch][x][y] = in_bytes[(x+y)%4];
+                    end
+                end
+            end
+        end
+        in_row_valid_i = in_valid;
+        upstream_stall = !in_row_accept_o;
+        in_row_last_i = 0;
+
+        out_valid = out_row_valid_o;
+        out_row_accept_i = !downstream_stall;
+        out_data = 0;
+        for (int x = 0; x < WIDTH/STRIDE; x++) begin
+            for (int out_ch = 0; out_ch < OUT_CHANNELS; out_ch++) begin
+                // To ensure that it does not optimize out out_row_o
+                out_data[x] ^= ^out_row_o[x][out_ch];
+            end
+        end
+    end
 endmodule 
 
 
