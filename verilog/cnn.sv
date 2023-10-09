@@ -58,15 +58,15 @@ module cnn_top(
     // GLUE LOGIC TO MAKE SURE NEURAL NETWORK NOT OPTIMIZED AWAY FOR AREA/POWER/FMAX CALCULATIONS
     logic [VALUE_BITS-1 : 0] in_row_par[WIDTH*IN_CHANNELS];
 
-    parallelize #(.N(WIDTH*IN_CHANNELS), .DATA_BITS(VALUE_BITS)) par2ser(
+    parallelize #(.N(WIDTH*IN_CHANNELS), .DATA_BITS(VALUE_BITS), .DATA_PER_WORD(1)) par2ser(
         .clock(clock), .reset(reset), 
         .in_data(in_data), .in_valid(in_valid), 
         .out_data(in_row_par), .out_valid(in_row_valid_i),
         .downstream_stall(!in_row_accept_o), .upstream_stall(upstream_stall)
     );
 
-    logic [31 : 0] out_row_par[OUT_WIDTH*OUT_CHANNELS];
-    serialize #(.N(OUT_WIDTH*OUT_CHANNELS), .DATA_BITS(32)) ser2par(
+    logic [VALUE_BITS-1 : 0] out_row_par[OUT_WIDTH*OUT_CHANNELS];
+    serialize #(.N(OUT_WIDTH*OUT_CHANNELS), .DATA_BITS(VALUE_BITS), .DATA_PER_WORD(1)) ser2par(
         .clock(clock), .reset(reset), 
         .in_data(out_row_par), .in_valid(out_row_valid_o),
         .out_data(out_data), .out_valid(out_valid),

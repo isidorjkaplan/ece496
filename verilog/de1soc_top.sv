@@ -21,11 +21,11 @@ module de1soc_top(
     );
 endmodule 
 
-module parallelize #(parameter N, DATA_BITS=32) (
+module parallelize #(parameter N, DATA_BITS, DATA_PER_WORD, WORD_SIZE=32) (
     input wire clock, 
     input wire reset, //+ve synchronous reset
 
-    input wire [ DATA_BITS-1 : 0 ] in_data,
+    input wire [ WORD_SIZE-1 : 0 ] in_data,
     input wire in_valid,
 
     output reg [ DATA_BITS-1 : 0 ] out_data[N],
@@ -35,37 +35,42 @@ module parallelize #(parameter N, DATA_BITS=32) (
     output wire upstream_stall
 );
     logic [ DATA_BITS-1 : 0 ] data_buffer[N];
-    logic [$clog2(N)-1:0] word_idx;
+    logic [$clog2(N)-1:0] data_idx;
 
     always_ff@(posedge clock) begin
         if (reset) begin
-            word_idx <= 0;
+            data_idx <= 0;
         end
-        else if (in_valid && word_idx < N) begin
-            word_idx <= (word_idx + 1);
-            data_buffer[word_idx] <= in_data;
+        else if (in_valid && data_idx < N) begin
+            data_idx <= (data_idx + DATA_PER_WORD);
+            for (int data_num = 0; data_num < DATA_PER_WORD; data_num++) begin
+                if (data_idx + data_num < N) begin
+                    data_buffer[data_idx + data_num] 
+                    <= in_data[ DATA_BITS-1+data_num*DATA_BITS : 0+data_num*DATA_BITS ];
+                end
+            end
         end
-        else if (!downstream_stall && word_idx==N) begin
-            word_idx <= 0;
+        else if (!downstream_stall && data_idx>=N) begin
+            data_idx <= 0;
         end
     end
 
-    assign upstream_stall = word_idx == N;
-    assign out_valid = word_idx == N;
+    assign upstream_stall = data_idx >= N;
+    assign out_valid = data_idx >= N;
     assign out_data = data_buffer;
 
 endmodule
 
 
 // Takes in a wide internal wire format (such as output of jpeg) and serializes it over multiple cycles
-module serialize #(parameter N, DATA_BITS=32) (
+module serialize #(parameter N, DATA_BITS, DATA_PER_WORD, WORD_SIZE=32) (
     input wire clock, 
     input wire reset, //+ve synchronous reset
 
-    input wire [ 31 : 0 ] in_data[N],
+    input wire [ DATA_BITS-1 : 0 ] in_data[N],
     input wire in_valid,
 
-    output reg [ 31 : 0 ] out_data,
+    output reg [ WORD_SIZE-1 : 0 ] out_data,
     output reg out_valid, 
 
     input wire downstream_stall,
@@ -73,22 +78,22 @@ module serialize #(parameter N, DATA_BITS=32) (
 );
     logic buffer_valid;
     logic [ DATA_BITS-1 : 0 ] data_buffer[N];
-    logic [$clog2(N)-1:0] word_idx;
+    logic [$clog2(N)-1:0] data_idx;
 
     always_ff@(posedge clock) begin
         if (reset) begin
             buffer_valid <= 0;
-            word_idx <= 0;
+            data_idx <= 0;
         end
         else if (in_valid && !buffer_valid) begin
-            word_idx <= 0;
+            data_idx <= 0;
             data_buffer <= in_data;
             buffer_valid <= 1;
         end 
         else if (!downstream_stall && buffer_valid) begin
-            word_idx <= (word_idx + 1);
-            if (word_idx == N-1) begin
-                word_idx <= 0;
+            data_idx <= (data_idx + DATA_PER_WORD);
+            if (data_idx+DATA_PER_WORD >= N) begin
+                data_idx <= 0;
                 buffer_valid <= 0;
             end
         end
@@ -96,6 +101,14 @@ module serialize #(parameter N, DATA_BITS=32) (
 
     assign upstream_stall = buffer_valid;
     assign out_valid = buffer_valid;
-    assign out_data = data_buffer[word_idx];
+
+    always_comb begin
+        for (int data_num = 0; data_num < DATA_PER_WORD; data_num++) begin
+            if (data_idx + data_num < N) begin
+                out_data[ DATA_BITS-1+data_num*DATA_BITS : 0+data_num*DATA_BITS ] = data_buffer[data_idx + data_num];
+            end
+        end
+    end
+    //assign out_data = data_buffer[data_idx];
 
 endmodule
