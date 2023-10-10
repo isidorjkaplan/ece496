@@ -25,7 +25,7 @@ module cnn_top #(parameter
     parameter LAYER0_KERNAL_SIZE=3;
     parameter LAYER0_WIDTH=28;
     parameter LAYER0_IN_CHANNELS=1;
-    parameter LAYER0_OUT_CHANNELS=1;
+    parameter LAYER0_OUT_CHANNELS=10;
     parameter LAYER0_NUM_KERNALS=1;
 
     logic  [ WEIGHT_BITS-1 : 0 ] layer0_kernal_weights_i[LAYER0_OUT_CHANNELS][LAYER0_IN_CHANNELS][LAYER0_KERNAL_SIZE][LAYER0_KERNAL_SIZE];
@@ -331,24 +331,26 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS, WEIGHT
     );
 
     // KERNAL LOGIC
-    logic [ VALUE_BITS-1 : 0 ] kernal_arr_output [NUM_KERNALS][OUT_CHANNELS];
+    logic [ VALUE_BITS-1 : 0 ] kernal_arr_output [NUM_KERNALS];
 
     kernal_array #(
         .KERNAL_SIZE(KERNAL_SIZE), .NUM_KERNALS(NUM_KERNALS),
         .WEIGHT_BITS(WEIGHT_BITS), .WEIGHT_Q_SHIFT(WEIGHT_Q_SHIFT),
         .VALUE_BITS(VALUE_BITS),
-        .IN_CHANNELS(IN_CHANNELS), .OUT_CHANNELS(OUT_CHANNELS)
+        .IN_CHANNELS(IN_CHANNELS)
     ) kernals(
         .clock_i(clock_i), .reset_i(reset_i), 
-        .kernal_weights_i(kernal_weights_i), .image_values_i(buffer_taps), 
+        .kernal_weights_i(kernal_weights_i[out_ch_idx_q]), .image_values_i(buffer_taps), 
         .output_values_o(kernal_arr_output)
     );
 
     // BUFFER CONTROL FSM
     typedef enum {
         S_GET_NEXT_ROW, 
-        S_CALC_ROW_WAIT, 
+        S_KERNAL_WAIT,
+        S_KERNAL_COMPUTE, 
         S_CALC_ROW, 
+        S_WAIT_KERNAL,
         S_WAIT_ROW_READ
     } e_state;
 
@@ -359,6 +361,7 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS, WEIGHT
     logic [VALUE_BITS -1 : 0] out_row_q[WIDTH][OUT_CHANNELS];
     logic out_row_valid_q;
     logic out_row_last_q;
+    logic [ $clog2(OUT_CHANNELS)-1 : 0 ] out_ch_idx_q; 
 
     // For simple output ports
     assign out_row_o = out_row_q;
@@ -372,6 +375,7 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS, WEIGHT
     logic [VALUE_BITS -1 : 0] next_out_row[WIDTH][OUT_CHANNELS];
     logic next_out_row_valid;
     logic next_out_row_last;
+    logic [ $clog2(OUT_CHANNELS)-1 : 0 ] next_out_ch; 
 
     // Buffer combinational FSM logic
     always_comb begin
@@ -381,6 +385,7 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS, WEIGHT
         next_out_row = out_row_q;
         next_out_row_valid = out_row_valid_q;
         next_out_row_last = out_row_last_q;
+        next_out_ch = out_ch_idx_q;
         buffer_shift_horiz = 0;
         buffer_shift_vert = 0;
         in_row_accept_o = 0;
@@ -393,25 +398,37 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS, WEIGHT
                 in_row_accept_o = 1;
                 // Change state to be calculating over that row
                 if (next_row_idx >= KERNAL_SIZE) begin
-                    next_state = S_CALC_ROW_WAIT;
+                    next_state = S_KERNAL_WAIT;
+                    next_out_ch = 0; //for kernal computatins
                     next_col_idx = 0;
                 end
             end
         end
-        S_CALC_ROW_WAIT: begin
-            // We need to wait one cycle for kernal output to update
-            next_state = S_CALC_ROW;
+        S_KERNAL_WAIT: begin
+            // Wait one cycle for kernal output to update to reflect it's inout
+            next_state = S_KERNAL_COMPUTE;
+        end
+        S_KERNAL_COMPUTE: begin
+            // Latch the output
+            for (int kernal_num = 0; kernal_num < NUM_KERNALS; kernal_num++) begin
+                next_out_row[ (kernal_num*WIDTH/NUM_KERNALS) +  col_idx_q ][out_ch_idx_q] = kernal_arr_output[kernal_num];
+            end
+
+            // If this was the last value than go onto calculating the next row
+            if (out_ch_idx_q >= OUT_CHANNELS-1) begin
+                next_state = S_CALC_ROW;
+                next_out_ch_idx = 0;
+            end else begin
+                next_state = S_KERNAL_WAIT;
+                next_out_ch_idx = out_ch_idx_q + 1;
+            end
         end
         S_CALC_ROW: begin
             // TODO assuming can produce an output of the kernal each itteration; probably gonna have to stall here
             buffer_shift_horiz = 1;
             next_col_idx = col_idx_q + 1;
-            next_state = S_CALC_ROW_WAIT; // wait for kernal output to reflect this change
+            next_state = S_KERNAL_WAIT; // wait for kernal output to reflect this change
             
-            for (int kernal_num = 0; kernal_num < NUM_KERNALS; kernal_num++) begin
-                next_out_row[ (kernal_num*WIDTH/NUM_KERNALS) +  col_idx_q ] = kernal_arr_output[kernal_num];
-            end
-
             if (next_col_idx*NUM_KERNALS >= WIDTH) begin
                 next_state = S_WAIT_ROW_READ;
                 next_out_row_valid = 1;
@@ -440,6 +457,7 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS, WEIGHT
             col_idx_q <= 0;
             out_row_valid_q <= 0;
             out_row_last_q <= 0;
+            out_ch_idx_q <= 0;
         end else begin
             state_q <= next_state;
             row_idx_q <= next_row_idx;
@@ -447,6 +465,7 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS, WEIGHT
             out_row_q <= next_out_row;
             out_row_valid_q <= next_out_row_valid;
             out_row_last_q <= next_out_row_last;
+            out_ch_idx_q <= next_out_ch;
         end
     end
 
@@ -504,34 +523,32 @@ endmodule
 // Kernal weights and image values are in fixed-point format 
 module kernal_array #(parameter KERNAL_SIZE, NUM_KERNALS,
     WEIGHT_BITS, WEIGHT_Q_SHIFT,
-    VALUE_BITS, IN_CHANNELS, OUT_CHANNELS
+    VALUE_BITS, IN_CHANNELS
 ) (
     input clock_i, 
     input reset_i,
     // The weights for the kernal
-    input logic  [ WEIGHT_BITS-1: 0 ] kernal_weights_i[OUT_CHANNELS][IN_CHANNELS][KERNAL_SIZE][KERNAL_SIZE],
+    input logic  [ WEIGHT_BITS-1: 0 ] kernal_weights_i[IN_CHANNELS][KERNAL_SIZE][KERNAL_SIZE],
     // The image values for each of the stamped kernals
     input logic  [ VALUE_BITS-1 : 0 ] image_values_i  [NUM_KERNALS][IN_CHANNELS] [KERNAL_SIZE][KERNAL_SIZE],
     // The output values for each of the stamped kernals, comes on the clock-edge after inputs provided
-    output logic [ VALUE_BITS-1 : 0 ] output_values_o  [NUM_KERNALS][OUT_CHANNELS]
+    output logic [ VALUE_BITS-1 : 0 ] output_values_o  [NUM_KERNALS]
 );
-    logic [ VALUE_BITS-1 : 0 ] comb_values  [NUM_KERNALS][OUT_CHANNELS];
+    logic [ VALUE_BITS-1 : 0 ] comb_values  [NUM_KERNALS];
     // TODO pipeline this and add out_valid signal instead of just combinational logic
     always_comb begin
         for (int kernal_num = 0; kernal_num < NUM_KERNALS; kernal_num++) begin
-            for (int out_ch = 0; out_ch < OUT_CHANNELS; out_ch++) begin
-                // We are assigning output_values_o[kernal][channel] here
-                comb_values[kernal_num][out_ch] = 0;
-                // Take dot product of kernal_weights[out_channel] with image_values_i[kernal_num]
-                for (int in_ch = 0; in_ch < IN_CHANNELS; in_ch++) begin
-                    for (int x = 0; x < KERNAL_SIZE; x++) begin
-                        for (int y = 0; y < KERNAL_SIZE; y++) begin
-                            // Do fixed-point multiplication of the two scalar values
-                            comb_values[kernal_num][out_ch] += 
-                                (kernal_weights_i[out_ch][in_ch][x][y] 
-                                * image_values_i[kernal_num][in_ch][x][y])
-                                >> WEIGHT_Q_SHIFT;
-                        end
+            // We are assigning output_values_o[kernal][channel] here
+            comb_values[kernal_num] = 0;
+            // Take dot product of kernal_weights[out_channel] with image_values_i[kernal_num]
+            for (int in_ch = 0; in_ch < IN_CHANNELS; in_ch++) begin
+                for (int x = 0; x < KERNAL_SIZE; x++) begin
+                    for (int y = 0; y < KERNAL_SIZE; y++) begin
+                        // Do fixed-point multiplication of the two scalar values
+                        comb_values[kernal_num] += 
+                            (kernal_weights_i[in_ch][x][y] 
+                            * image_values_i[kernal_num][in_ch][x][y])
+                            >> WEIGHT_Q_SHIFT;
                     end
                 end
             end
