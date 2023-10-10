@@ -22,7 +22,7 @@ module cnn_top #(parameter
 
     // CNN LAYER 0
 
-    parameter LAYER0_KERNAL_SIZE=2;
+    parameter LAYER0_KERNAL_SIZE=3;
     parameter LAYER0_WIDTH=28;
     parameter LAYER0_IN_CHANNELS=1;
     parameter LAYER0_OUT_CHANNELS=1;
