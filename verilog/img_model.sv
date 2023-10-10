@@ -26,7 +26,7 @@ module cnn_top #(parameter
     parameter LAYER0_WIDTH=28;
     parameter LAYER0_IN_CHANNELS=1;
     parameter LAYER0_OUT_CHANNELS=4;
-    parameter LAYER0_NUM_KERNALS=1;
+    parameter LAYER0_NUM_KERNALS=2; // This layer was limiting performance so increasing
 
     logic  [ WEIGHT_BITS-1 : 0 ] layer0_kernal_weights_i[LAYER0_OUT_CHANNELS][LAYER0_IN_CHANNELS][LAYER0_KERNAL_SIZE][LAYER0_KERNAL_SIZE];
 
