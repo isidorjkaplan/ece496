@@ -317,6 +317,39 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS, WEIGHT
     output logic out_row_last_o,
     input logic out_row_accept_i
 );
+    // BUFFER CONTROL FSM
+    typedef enum {
+        S_GET_NEXT_ROW, 
+        S_KERNAL_WAIT,
+        S_KERNAL_COMPUTE, 
+        S_CALC_ROW, 
+        S_WAIT_KERNAL,
+        S_WAIT_ROW_READ
+    } e_state;
+
+    // buffer registers
+    e_state state_q; // for what mode we are in
+    logic [7 : 0] row_idx_q; // what row number is the next row we shift in
+    logic [7 : 0] col_idx_q; // what column is at zero (aka, how many times have we shifted
+    logic [VALUE_BITS -1 : 0] out_row_q[WIDTH][OUT_CHANNELS];
+    logic out_row_valid_q;
+    logic out_row_last_q;
+    logic [ $clog2(OUT_CHANNELS)-1 : 0 ] out_ch_idx_q; 
+
+
+    // For simple output ports
+    assign out_row_o = out_row_q;
+    assign out_row_valid_o = out_row_valid_q;
+    assign out_row_last_o = out_row_last_q;
+
+    // buffer signals
+    e_state next_state;
+    logic [7 : 0] next_row_idx;
+    logic [7 : 0] next_col_idx;
+    logic [VALUE_BITS -1 : 0] next_out_row[WIDTH][OUT_CHANNELS];
+    logic next_out_row_valid;
+    logic next_out_row_last;
+    logic [ $clog2(OUT_CHANNELS)-1 : 0 ] next_out_ch_idx; 
 
     // BUFFER LOGIC
     
@@ -344,38 +377,6 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS, WEIGHT
         .output_values_o(kernal_arr_output)
     );
 
-    // BUFFER CONTROL FSM
-    typedef enum {
-        S_GET_NEXT_ROW, 
-        S_KERNAL_WAIT,
-        S_KERNAL_COMPUTE, 
-        S_CALC_ROW, 
-        S_WAIT_KERNAL,
-        S_WAIT_ROW_READ
-    } e_state;
-
-    // buffer registers
-    e_state state_q; // for what mode we are in
-    logic [7 : 0] row_idx_q; // what row number is the next row we shift in
-    logic [7 : 0] col_idx_q; // what column is at zero (aka, how many times have we shifted
-    logic [VALUE_BITS -1 : 0] out_row_q[WIDTH][OUT_CHANNELS];
-    logic out_row_valid_q;
-    logic out_row_last_q;
-    logic [ $clog2(OUT_CHANNELS)-1 : 0 ] out_ch_idx_q; 
-
-    // For simple output ports
-    assign out_row_o = out_row_q;
-    assign out_row_valid_o = out_row_valid_q;
-    assign out_row_last_o = out_row_last_q;
-
-    // buffer signals
-    e_state next_state;
-    logic [7 : 0] next_row_idx;
-    logic [7 : 0] next_col_idx;
-    logic [VALUE_BITS -1 : 0] next_out_row[WIDTH][OUT_CHANNELS];
-    logic next_out_row_valid;
-    logic next_out_row_last;
-    logic [ $clog2(OUT_CHANNELS)-1 : 0 ] next_out_ch; 
 
     // Buffer combinational FSM logic
     always_comb begin
@@ -385,7 +386,7 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS, WEIGHT
         next_out_row = out_row_q;
         next_out_row_valid = out_row_valid_q;
         next_out_row_last = out_row_last_q;
-        next_out_ch = out_ch_idx_q;
+        next_out_ch_idx = out_ch_idx_q;
         buffer_shift_horiz = 0;
         buffer_shift_vert = 0;
         in_row_accept_o = 0;
@@ -399,7 +400,7 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS, WEIGHT
                 // Change state to be calculating over that row
                 if (next_row_idx >= KERNAL_SIZE) begin
                     next_state = S_KERNAL_WAIT;
-                    next_out_ch = 0; //for kernal computatins
+                    next_out_ch_idx = 0; //for kernal computatins
                     next_col_idx = 0;
                 end
             end
@@ -414,13 +415,13 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS, WEIGHT
                 next_out_row[ (kernal_num*WIDTH/NUM_KERNALS) +  col_idx_q ][out_ch_idx_q] = kernal_arr_output[kernal_num];
             end
 
+            next_state = S_KERNAL_WAIT;
+            next_out_ch_idx = out_ch_idx_q + 1;
+
             // If this was the last value than go onto calculating the next row
             if (out_ch_idx_q >= OUT_CHANNELS-1) begin
                 next_state = S_CALC_ROW;
                 next_out_ch_idx = 0;
-            end else begin
-                next_state = S_KERNAL_WAIT;
-                next_out_ch_idx = out_ch_idx_q + 1;
             end
         end
         S_CALC_ROW: begin
@@ -465,7 +466,7 @@ module cnn_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS, WEIGHT
             out_row_q <= next_out_row;
             out_row_valid_q <= next_out_row_valid;
             out_row_last_q <= next_out_row_last;
-            out_ch_idx_q <= next_out_ch;
+            out_ch_idx_q <= next_out_ch_idx;
         end
     end
 
