@@ -52,6 +52,7 @@ int main(int argc, char* argv[]) {
         res = recv(client_sock, msg+offset, 4096 - offset, 0);
         if (res == -1) {std::cout << "Error recieving msg" << std::endl; return 1;}
         if (res == 0) {std::cout << "Error connection closed unexpectedly" << std::endl; return 1;}
+        offset += res;
     }
     std::cout << "Succesfully recieved data" << std::endl;
     // just echo the packet
