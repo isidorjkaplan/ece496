@@ -114,7 +114,7 @@ module de1soc_tb();
             $display("Read result row %d", i);
         end
         $display("Reader thread finished -- Killing simulator\n");
-        $stop();
+        //$stop();
     end
 
     initial begin
