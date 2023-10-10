@@ -17,100 +17,139 @@ module cnn_top(
     parameter VALUE_BITS=8;
     parameter WEIGHT_BITS=8;
     parameter WEIGHT_Q_SHIFT=6;
-    parameter KERNAL_SIZE=2;
-    parameter WIDTH=28;
-    parameter IN_CHANNELS=1;
-    parameter OUT_CHANNELS=1;
-    parameter NUM_KERNALS=1;
 
-    logic  [ WEIGHT_BITS-1 : 0 ] kernal_weights_i[OUT_CHANNELS][IN_CHANNELS][KERNAL_SIZE][KERNAL_SIZE];
+    // CNN LAYER 0
 
-    logic [VALUE_BITS-1 : 0] in_row_i[WIDTH][IN_CHANNELS];
-    logic in_row_valid_i, in_row_accept_o, in_row_last_i;
+    parameter LAYER0_KERNAL_SIZE=2;
+    parameter LAYER0_WIDTH=28;
+    parameter LAYER0_IN_CHANNELS=1;
+    parameter LAYER0_OUT_CHANNELS=1;
+    parameter LAYER0_NUM_KERNALS=1;
+
+    logic  [ WEIGHT_BITS-1 : 0 ] layer0_kernal_weights_i[LAYER0_OUT_CHANNELS][LAYER0_IN_CHANNELS][LAYER0_KERNAL_SIZE][LAYER0_KERNAL_SIZE];
+
+    logic [VALUE_BITS-1 : 0] layer0_in_row_i[LAYER0_WIDTH][LAYER0_IN_CHANNELS];
+    logic layer0_in_row_valid_i, layer0_in_row_accept_o, layer0_in_row_last_i;
     
-    logic [VALUE_BITS -1 : 0] out_row_o[WIDTH/KERNAL_SIZE][OUT_CHANNELS];
-    logic out_row_valid_o;
-    logic out_row_accept_i;
-    logic out_row_last_o;
-
-    /*
+    logic [VALUE_BITS -1 : 0] layer0_out_row_o[LAYER0_WIDTH][LAYER0_OUT_CHANNELS];
+    logic layer0_out_row_valid_o;
+    logic layer0_out_row_accept_i;
+    logic layer0_out_row_last_o;
+    
     cnn_layer #(
-        .KERNAL_SIZE(KERNAL_SIZE), .NUM_KERNALS(NUM_KERNALS), 
-        .WIDTH(WIDTH), .VALUE_BITS(VALUE_BITS), .WEIGHT_BITS(WEIGHT_BITS), .WEIGHT_Q_SHIFT(WEIGHT_Q_SHIFT), .IN_CHANNELS(IN_CHANNELS), .OUT_CHANNELS(OUT_CHANNELS)
+        .KERNAL_SIZE(LAYER0_KERNAL_SIZE), .NUM_KERNALS(LAYER0_NUM_KERNALS), 
+        .WIDTH(LAYER0_WIDTH), .VALUE_BITS(VALUE_BITS), .WEIGHT_BITS(WEIGHT_BITS), .WEIGHT_Q_SHIFT(WEIGHT_Q_SHIFT), 
+        .IN_CHANNELS(LAYER0_IN_CHANNELS), .OUT_CHANNELS(LAYER0_OUT_CHANNELS)
     ) layer0(
         // General
         .clock_i(clock), .reset_i(reset),
-        .kernal_weights_i(kernal_weights_i),
+        .kernal_weights_i(layer0_kernal_weights_i),
         // INPUT INFO
-        .in_row_i(in_row_i),
-        .in_row_valid_i(in_row_valid_i),
-        .in_row_accept_o(in_row_accept_o),
-        .in_row_last_i(in_row_last_i),
+        .in_row_i(layer0_in_row_i),
+        .in_row_valid_i(layer0_in_row_valid_i),
+        .in_row_accept_o(layer0_in_row_accept_o),
+        .in_row_last_i(layer0_in_row_last_i),
         // OUT INFO
-        .out_row_o(out_row_o),
-        .out_row_valid_o(out_row_valid_o),
-        .out_row_accept_i(out_row_accept_i),
-        .out_row_last_o(out_row_last_o)
-    );*/
+        .out_row_o(layer0_out_row_o),
+        .out_row_valid_o(layer0_out_row_valid_o),
+        .out_row_accept_i(layer0_out_row_accept_i),
+        .out_row_last_o(layer0_out_row_last_o)
+    );
+
+    // INPUT -> LAYER0 GLUE LOGIC
+    logic [VALUE_BITS-1 : 0] in_row_par[LAYER0_WIDTH*LAYER0_IN_CHANNELS];
+
+    parallelize #(.N(LAYER0_WIDTH*LAYER0_IN_CHANNELS), .DATA_BITS(VALUE_BITS), .DATA_PER_WORD(1)) par2ser(
+        .clock(clock), .reset(reset), 
+        .in_data(in_data), .in_valid(in_valid), 
+        .out_data(in_row_par), .out_valid(layer0_in_row_valid_i),
+        .downstream_stall(!layer0_in_row_accept_o), .upstream_stall(upstream_stall)
+    );
+    
+    always_comb begin
+        layer0_in_row_last_i = 0;
+        for (int x = 0; x < LAYER0_WIDTH; x++) begin
+            for (int in_ch = 0; in_ch < LAYER0_IN_CHANNELS; in_ch++) begin
+                layer0_in_row_i[x][in_ch] = in_row_par[x + in_ch*LAYER0_WIDTH];
+            end
+        end
+    end
+
+    // POOLING LAYER 0
+
+    parameter POOL0_KERNAL_SIZE=2;
+    parameter POOL0_NUM_KERNALS=1;
+    parameter POOL0_WIDTH=LAYER0_WIDTH;
+    parameter POOL0_CHANNELS=LAYER0_OUT_CHANNELS;
+    parameter POOL0_OUT_WIDTH = POOL0_WIDTH / POOL0_KERNAL_SIZE;
+
+    logic [VALUE_BITS - 1 : 0] pool0_in_row_i[POOL0_WIDTH][POOL0_CHANNELS];
+    logic pool0_in_row_valid_i, pool0_in_row_accept_o, pool0_in_row_last_i;
+    
+    logic [VALUE_BITS - 1 : 0] pool0_out_row_o[POOL0_OUT_WIDTH][POOL0_CHANNELS];
+    logic pool0_out_row_valid_o;
+    logic pool0_out_row_accept_i;
+    logic pool0_out_row_last_o;
+
     max_pooling_layer #(
-        .KERNAL_SIZE(KERNAL_SIZE), .NUM_KERNALS(NUM_KERNALS), 
-        .WIDTH(WIDTH), .VALUE_BITS(VALUE_BITS), .CHANNELS(IN_CHANNELS)
+        .KERNAL_SIZE(POOL0_KERNAL_SIZE), .NUM_KERNALS(POOL0_NUM_KERNALS), 
+        .WIDTH(POOL0_WIDTH), .VALUE_BITS(VALUE_BITS), .CHANNELS(POOL0_CHANNELS)
     ) pool0 (
         // General
         .clock_i(clock), .reset_i(reset),
         // INPUT INFO
-        .in_row_i(in_row_i),
-        .in_row_valid_i(in_row_valid_i),
-        .in_row_accept_o(in_row_accept_o),
-        .in_row_last_i(in_row_last_i),
+        .in_row_i(pool0_in_row_i),
+        .in_row_valid_i(pool0_in_row_valid_i),
+        .in_row_accept_o(pool0_in_row_accept_o),
+        .in_row_last_i(pool0_in_row_last_i),
         // OUT INFO
-        .out_row_o(out_row_o),
-        .out_row_valid_o(out_row_valid_o),
-        .out_row_accept_i(out_row_accept_i),
-        .out_row_last_o(out_row_last_o)
+        .out_row_o(pool0_out_row_o),
+        .out_row_valid_o(pool0_out_row_valid_o),
+        .out_row_accept_i(pool0_out_row_accept_i),
+        .out_row_last_o(pool0_out_row_last_o)
     );
 
-    // GLUE LOGIC TO MAKE SURE NEURAL NETWORK NOT OPTIMIZED AWAY FOR AREA/POWER/FMAX CALCULATIONS
-    logic [VALUE_BITS-1 : 0] in_row_par[WIDTH*IN_CHANNELS];
+    // LAYER0 -> POOL0 GLUE LOGIC
+    assign pool0_in_row_i = layer0_out_row_o;
+    assign pool0_in_row_valid_i = layer0_out_row_valid_o;
+    assign layer0_out_row_accept_i = pool0_in_row_accept_o;
+    assign pool0_in_row_last_i = layer0_out_row_last_o;
 
-    parallelize #(.N(WIDTH*IN_CHANNELS), .DATA_BITS(VALUE_BITS), .DATA_PER_WORD(1)) par2ser(
-        .clock(clock), .reset(reset), 
-        .in_data(in_data), .in_valid(in_valid), 
-        .out_data(in_row_par), .out_valid(in_row_valid_i),
-        .downstream_stall(!in_row_accept_o), .upstream_stall(upstream_stall)
-    );
+    // POOL0 -> OUT glue logic
 
-    logic [VALUE_BITS-1 : 0] out_row_par[WIDTH*OUT_CHANNELS];
-    serialize #(.N(WIDTH*OUT_CHANNELS), .DATA_BITS(VALUE_BITS), .DATA_PER_WORD(1)) ser2par(
+
+    logic [VALUE_BITS-1 : 0] out_row_par[POOL0_OUT_WIDTH*POOL0_CHANNELS];
+    serialize #(.N(POOL0_OUT_WIDTH*POOL0_CHANNELS), .DATA_BITS(VALUE_BITS), .DATA_PER_WORD(1)) ser2par(
         .clock(clock), .reset(reset), 
-        .in_data(out_row_par), .in_valid(out_row_valid_o),
+        .in_data(out_row_par), .in_valid(pool0_out_row_valid_o),
         .out_data(out_data), .out_valid(out_valid),
-        .downstream_stall(downstream_stall), .upstream_stall(out_row_accept_i)
+        .downstream_stall(downstream_stall), .upstream_stall(pool0_out_row_accept_i)
     );
+    always_comb begin
+        for (int x = 0; x < POOL0_OUT_WIDTH; x++) begin
+            for (int out_ch = 0; out_ch < POOL0_CHANNELS; out_ch++) begin
+                out_row_par[x + out_ch*POOL0_OUT_WIDTH] = pool0_out_row_o[x][out_ch];
+            end
+        end
+    end
+
+    // NEURAL NETWORK WEIGHTS DEFINITION - ALL LAYERS
 
     always_comb begin
-        for (int out_ch = 0; out_ch < OUT_CHANNELS; out_ch++) begin
-            for (int in_ch = 0; in_ch < IN_CHANNELS; in_ch++) begin
-                for (int x = 0; x < KERNAL_SIZE; x++) begin
-                    for (int y = 0; y < KERNAL_SIZE; y++) begin
-                        kernal_weights_i[out_ch][in_ch][x][y] = (1<<WEIGHT_Q_SHIFT)/(OUT_CHANNELS*IN_CHANNELS*KERNAL_SIZE*KERNAL_SIZE);
+        // LAYER 0 WEIGHTS
+        for (int out_ch = 0; out_ch < LAYER0_OUT_CHANNELS; out_ch++) begin
+            for (int in_ch = 0; in_ch < LAYER0_IN_CHANNELS; in_ch++) begin
+                for (int x = 0; x < LAYER0_KERNAL_SIZE; x++) begin
+                    for (int y = 0; y < LAYER0_KERNAL_SIZE; y++) begin
+                        layer0_kernal_weights_i[out_ch][in_ch][x][y] 
+                        = (1<<WEIGHT_Q_SHIFT)
+                            / (LAYER0_OUT_CHANNELS*LAYER0_IN_CHANNELS*LAYER0_KERNAL_SIZE*LAYER0_KERNAL_SIZE);
                     end
                 end
             end
         end
-        in_row_last_i = 0;
-
-        for (int x = 0; x < WIDTH; x++) begin
-            for (int out_ch = 0; out_ch < OUT_CHANNELS; out_ch++) begin
-                out_row_par[x + out_ch*WIDTH] = out_row_o[x][out_ch];
-            end
-        end
-        for (int x = 0; x < WIDTH; x++) begin
-            for (int in_ch = 0; in_ch < IN_CHANNELS; in_ch++) begin
-                in_row_i[x][in_ch] = in_row_par[x + in_ch*WIDTH];
-            end
-        end
     end
+
 endmodule 
 
 
@@ -193,6 +232,8 @@ module max_pooling_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS
                         // For all channels we do this operation
                         for (int ch_num = 0; ch_num < CHANNELS; ch_num++) begin
                             // Update value we will write if it is greater than current values for row
+                            // TODO -- Need to use twos-compliment signed version of compare instead of unsigned
+                            // Actually probably need to check that I do that everywhere, everything is unsigned rn
                             if (next_out_row[ pos_idx_q ][ch_num] < in_row_q[ tmp_input_idx ][ch_num] ) begin
                                 next_out_row[ pos_idx_q ][ch_num] = in_row_q[ tmp_input_idx ][ch_num];
                             end

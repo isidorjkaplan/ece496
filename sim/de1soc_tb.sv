@@ -2,6 +2,11 @@
 
 
 module de1soc_tb();
+
+    parameter IMG_WIDTH = 28;
+    parameter OUTPUT_ROW_SIZE = 14; //due to pooling
+    parameter IMG_HEIGHT = IMG_WIDTH;
+
     logic clk_reset;
 
     logic clock;
@@ -47,8 +52,8 @@ module de1soc_tb();
 
     task automatic write_row(int N);
     begin
-        for (int i = 0; i < 28; i++) begin
-            write_value(i + N*28);
+        for (int i = 0; i < IMG_WIDTH; i++) begin
+            write_value(i + N*IMG_WIDTH);
         end
     end
     endtask
@@ -95,8 +100,9 @@ module de1soc_tb();
             @(posedge clock);
         end
 
-        for (int i = 0; i < 28-2; i++) begin
-            read_values(28);
+        // -1 beacuse of effects of kernal reducing the height
+        for (int i = 0; i < OUTPUT_ROW_SIZE-1; i++) begin
+            read_values(OUTPUT_ROW_SIZE);
             $display("Read result row %d", i);
         end
         $display("Reader thread finished -- Killing simulator\n");
