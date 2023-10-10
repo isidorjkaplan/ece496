@@ -3,6 +3,7 @@
 
 module de1soc_tb();
 
+    parameter VALUES_PER_WORD=4;
     parameter IMG_WIDTH = 28;
     parameter OUTPUT_ROW_SIZE = 14; //due to pooling
     parameter IMG_HEIGHT = IMG_WIDTH;
@@ -20,7 +21,7 @@ module de1soc_tb();
 
     logic downstream_stall;
     logic upstream_stall;
-    cnn_top dut(.clock(clock), .reset(reset), 
+    cnn_top #(.VALUES_PER_WORD(VALUES_PER_WORD)) dut(.clock(clock), .reset(reset), 
 	// Inputs
 	.in_data(in_data), .in_valid(in_valid),
 	// Outputs
@@ -28,9 +29,12 @@ module de1soc_tb();
 	// Control Flow
 	.downstream_stall(downstream_stall), .upstream_stall(upstream_stall));
 
-    task automatic write_value(input [31:0] value);
+    task automatic write_values(input [7:0] values[VALUES_PER_WORD]);
     begin
-        in_data = value;
+        in_data = 0;
+        for (int i = 0; i < VALUES_PER_WORD; i++) begin
+            in_data[ 8*i +: 8 ] = values[i];
+        end
         in_valid = 1;
         #1
         while (upstream_stall) begin
@@ -52,8 +56,12 @@ module de1soc_tb();
 
     task automatic write_row(int N);
     begin
-        for (int i = 0; i < IMG_WIDTH; i++) begin
-            write_value(i + N*IMG_WIDTH);
+        logic [7:0] values[VALUES_PER_WORD];
+        for (int i = 0; i < IMG_WIDTH; i+=VALUES_PER_WORD) begin
+            for (int j = 0; j < VALUES_PER_WORD; j++) begin
+                values[j] = i+j+N*IMG_WIDTH;
+            end
+            write_values(values);
         end
     end
     endtask
@@ -77,7 +85,7 @@ module de1soc_tb();
 
     task automatic read_values(int N);
     begin
-        for (int i = 0; i < N; i++) begin
+        for (int i = 0; i < N; i+=VALUES_PER_WORD) begin
             read_next_value();
         end
     end
@@ -86,7 +94,7 @@ module de1soc_tb();
     assign #5 clock = ~clock & !clk_reset;
     
     initial begin
-        for (int i = 0; i < 10000; i++) begin
+        for (int i = 0; i < 5*10000; i++) begin
             @(posedge clock);
         end
         $display("Ran out of time -- murdering simulator\n");

@@ -1,7 +1,10 @@
 
 
 // Input is streamed where we recieve an image as 28*28 individual transfers with the grayscale values
-module cnn_top(
+module cnn_top #(parameter 
+    VALUES_PER_WORD = 1,
+    VALUE_BITS = 8
+)(
     input logic clock, 
     input logic reset, //+ve synchronous reset
 
@@ -14,7 +17,6 @@ module cnn_top(
     input logic downstream_stall,
     output logic upstream_stall
 );    
-    parameter VALUE_BITS=8;
     parameter WEIGHT_BITS=8;
     parameter WEIGHT_Q_SHIFT=6;
 
@@ -59,7 +61,7 @@ module cnn_top(
     // INPUT -> LAYER0 GLUE LOGIC
     logic [VALUE_BITS-1 : 0] in_row_par[LAYER0_WIDTH*LAYER0_IN_CHANNELS];
 
-    parallelize #(.N(LAYER0_WIDTH*LAYER0_IN_CHANNELS), .DATA_BITS(VALUE_BITS), .DATA_PER_WORD(1)) par2ser(
+    parallelize #(.N(LAYER0_WIDTH*LAYER0_IN_CHANNELS), .DATA_BITS(VALUE_BITS), .DATA_PER_WORD(VALUES_PER_WORD)) par2ser(
         .clock(clock), .reset(reset), 
         .in_data(in_data), .in_valid(in_valid), 
         .out_data(in_row_par), .out_valid(layer0_in_row_valid_i),
@@ -119,7 +121,7 @@ module cnn_top(
 
 
     logic [VALUE_BITS-1 : 0] out_row_par[POOL0_OUT_WIDTH*POOL0_CHANNELS];
-    serialize #(.N(POOL0_OUT_WIDTH*POOL0_CHANNELS), .DATA_BITS(VALUE_BITS), .DATA_PER_WORD(1)) ser2par(
+    serialize #(.N(POOL0_OUT_WIDTH*POOL0_CHANNELS), .DATA_BITS(VALUE_BITS), .DATA_PER_WORD(VALUES_PER_WORD)) ser2par(
         .clock(clock), .reset(reset), 
         .in_data(out_row_par), .in_valid(pool0_out_row_valid_o),
         .out_data(out_data), .out_valid(out_valid),
