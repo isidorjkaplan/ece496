@@ -3,7 +3,8 @@
 // Input is streamed where we recieve an image as 28*28 individual transfers with the grayscale values
 module cnn_top #(
     parameter VALUE_BITS = 8,
-    localparam INPUT_WIDTH = 28, INPUT_CHANNELS=1, OUTPUT_WIDTH = 1, OUTPUT_CHANNELS = 10, TAG_WIDTH = 6
+    // DO NOT CHANGE BELOW VALUES
+    INPUT_WIDTH = 28, INPUT_CHANNELS=1, OUTPUT_WIDTH = 1, OUTPUT_CHANNELS = 10, TAG_WIDTH = 6
 )(
     // General signals
     input clock_i, input reset_i,

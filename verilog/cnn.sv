@@ -149,7 +149,8 @@ endmodule
 
 module cnn_layer #(
     parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS, WEIGHT_BITS, WEIGHT_Q_SHIFT, IN_CHANNELS, OUT_CHANNELS, TAG_WIDTH,
-    localparam OUT_WIDTH = WIDTH - KERNAL_SIZE + 1
+    // DO NOT CHANGE BELOW VALUES
+    OUT_WIDTH = WIDTH - KERNAL_SIZE + 1
     ) (
     // General signals
     input clock_i, input reset_i,
@@ -247,6 +248,7 @@ module cnn_layer #(
         buffer_shift_horiz = 0;
         buffer_shift_vert = 0;
         in_row_accept_o = 0;
+
         case (state_q) 
         S_GET_NEXT_ROW: begin
             if (in_row_valid_i) begin
@@ -310,6 +312,8 @@ module cnn_layer #(
             end
         end
         endcase
+        // Don't actually infer a signal for this
+        tmp_idx = 0;
     end
 
     // Buffer sequential logic
