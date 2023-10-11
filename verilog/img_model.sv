@@ -27,13 +27,14 @@ module cnn_top #(parameter
     parameter LAYER0_IN_CHANNELS=1;
     parameter LAYER0_OUT_CHANNELS=4;
     parameter LAYER0_NUM_KERNALS=2; // This layer was limiting performance so increasing
+    parameter LAYER0_OUT_WIDTH = LAYER0_WIDTH - LAYER0_KERNAL_SIZE + 1;
 
     logic  [ WEIGHT_BITS-1 : 0 ] layer0_kernal_weights_i[LAYER0_OUT_CHANNELS][LAYER0_IN_CHANNELS][LAYER0_KERNAL_SIZE][LAYER0_KERNAL_SIZE];
 
     logic [VALUE_BITS-1 : 0] layer0_in_row_i[LAYER0_WIDTH][LAYER0_IN_CHANNELS];
     logic layer0_in_row_valid_i, layer0_in_row_accept_o, layer0_in_row_last_i;
     
-    logic [VALUE_BITS -1 : 0] layer0_out_row_o[LAYER0_WIDTH][LAYER0_OUT_CHANNELS];
+    logic [VALUE_BITS -1 : 0] layer0_out_row_o[LAYER0_OUT_WIDTH][LAYER0_OUT_CHANNELS];
     logic layer0_out_row_valid_o;
     logic layer0_out_row_accept_i;
     logic layer0_out_row_last_o;
@@ -81,7 +82,7 @@ module cnn_top #(parameter
 
     parameter POOL0_KERNAL_SIZE=2;
     parameter POOL0_NUM_KERNALS=1;
-    parameter POOL0_WIDTH=LAYER0_WIDTH;
+    parameter POOL0_WIDTH=LAYER0_OUT_WIDTH;
     parameter POOL0_CHANNELS=LAYER0_OUT_CHANNELS;
     parameter POOL0_OUT_WIDTH = POOL0_WIDTH / POOL0_KERNAL_SIZE;
 
@@ -121,6 +122,7 @@ module cnn_top #(parameter
 
     parameter LAYER1_KERNAL_SIZE=3;
     parameter LAYER1_WIDTH=POOL0_OUT_WIDTH;
+    parameter LAYER1_OUT_WIDTH = LAYER1_WIDTH - LAYER1_KERNAL_SIZE + 1;
     parameter LAYER1_IN_CHANNELS=POOL0_CHANNELS;
     parameter LAYER1_OUT_CHANNELS=10;
     parameter LAYER1_NUM_KERNALS=1;
@@ -130,7 +132,7 @@ module cnn_top #(parameter
     logic [VALUE_BITS-1 : 0] layer1_in_row_i[LAYER1_WIDTH][LAYER1_IN_CHANNELS];
     logic layer1_in_row_valid_i, layer1_in_row_accept_o, layer1_in_row_last_i;
     
-    logic [VALUE_BITS -1 : 0] layer1_out_row_o[LAYER1_WIDTH][LAYER1_OUT_CHANNELS];
+    logic [VALUE_BITS -1 : 0] layer1_out_row_o[LAYER1_OUT_WIDTH][LAYER1_OUT_CHANNELS];
     logic layer1_out_row_valid_o;
     logic layer1_out_row_accept_i;
     logic layer1_out_row_last_o;
@@ -163,9 +165,9 @@ module cnn_top #(parameter
 
     // POOLING LAYER 1
 
-    parameter POOL1_KERNAL_SIZE=2;
+    parameter POOL1_KERNAL_SIZE=LAYER1_OUT_WIDTH; // this should reduce it to 1x1xCHANNELS which is output shape we want
     parameter POOL1_NUM_KERNALS=1;
-    parameter POOL1_WIDTH=LAYER1_WIDTH;
+    parameter POOL1_WIDTH=LAYER1_OUT_WIDTH;
     parameter POOL1_CHANNELS=LAYER1_OUT_CHANNELS;
     parameter POOL1_OUT_WIDTH = POOL1_WIDTH / POOL1_KERNAL_SIZE;
 

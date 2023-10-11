@@ -3,9 +3,8 @@
 
 module de1soc_tb();
 
-    parameter VALUES_PER_WORD=4;
+    parameter VALUES_PER_WORD=1;
     parameter IMG_WIDTH = 28;
-    parameter OUTPUT_ROW_SIZE = 14; //due to pooling
     parameter IMG_HEIGHT = IMG_WIDTH;
 
     logic clk_reset;
@@ -21,6 +20,10 @@ module de1soc_tb();
 
     logic downstream_stall;
     logic upstream_stall;
+
+    int timed_out;
+    int read_count;
+
     cnn_top #(.VALUES_PER_WORD(VALUES_PER_WORD)) dut(.clock(clock), .reset(reset), 
 	// Inputs
 	.in_data(in_data), .in_valid(in_valid),
@@ -66,12 +69,21 @@ module de1soc_tb();
     end
     endtask
 
-    task automatic read_next_value();
+    task automatic read_next_value(int timeout);
     begin
+        int count = timeout;
+        timed_out = 0;
         // Ready to read
         downstream_stall = 0;
         #1;
         while (!out_valid) begin
+            if (timeout != 0) begin
+                if (count == 0) begin
+                    timed_out = 1;
+                    return;
+                end
+                count = count - 1;
+            end
             @(posedge clock);
             #1;
         end
@@ -83,10 +95,21 @@ module de1soc_tb();
     end
     endtask
 
-    task automatic read_values(int N);
+    task automatic read_values(int N, int timeout);
     begin
+        read_count = 0;
         for (int i = 0; i < N; i+=VALUES_PER_WORD) begin
-            read_next_value();
+            read_next_value(timeout);
+            if (timed_out) return;
+            read_count++;
+        end
+    end
+    endtask
+
+    task automatic wait_cycles(int N);
+    begin
+        for (int i = 0; i < N; i++) begin
+            @(posedge clock);
         end
     end
     endtask
@@ -94,9 +117,7 @@ module de1soc_tb();
     assign #5 clock = ~clock & !clk_reset;
     
     initial begin
-        for (int i = 0; i < 5*10000; i++) begin
-            @(posedge clock);
-        end
+        wait_cycles(50000);
         $display("Ran out of time -- murdering simulator\n");
         $stop();
     end
@@ -104,16 +125,17 @@ module de1soc_tb();
     // Reader thread
     initial begin
         // Wait until writer thread reliably running
-        for (int i = 0; i < 20; i++) begin
-            @(posedge clock);
+        wait_cycles(20);
+
+        while (1) begin
+            // blocking read until we get first value value
+            read_values(10000000, 5);
+            if (read_count > 0) begin
+                $display("Read burst result of %d words", read_count);
+            end
         end
 
-        // -1 beacuse of effects of kernal reducing the height
-        for (int i = 0; i < OUTPUT_ROW_SIZE-1; i++) begin
-            read_values(OUTPUT_ROW_SIZE);
-            $display("Read result row %d", i);
-        end
-        $display("Reader thread finished -- Killing simulator\n");
+        //$display("Reader thread finished -- Killing simulator\n");
         //$stop();
     end
 
@@ -127,12 +149,16 @@ module de1soc_tb();
         @(posedge clock);
         reset = 0;
         @(posedge clock);
-
-        for (int i = 0; i < 28; i++) begin
-            write_row(i);
-            $display("Wrote row %d", i);
+        for (int img_num = 0; img_num < 3; img_num++) begin
+            for (int i = 0; i < 28; i++) begin
+                write_row(i);
+                $display("Wrote row %d", i);
+            end
+            wait_cycles(1000);
         end
         $display("Writer thread finished");
+        wait_cycles(1000);
+        $display("Writer thread terminating sim");
         
     end
 endmodule 
