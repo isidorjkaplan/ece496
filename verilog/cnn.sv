@@ -27,6 +27,7 @@ module max_pooling_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS
     logic [VALUE_BITS - 1 : 0] in_row_q[WIDTH][CHANNELS];
     logic [VALUE_BITS - 1 : 0] out_row_q[OUT_WIDTH][CHANNELS];
     logic [ $clog2(OUT_WIDTH)-1 : 0 ] pos_idx_q; // in output, not in input
+    logic [ $clog2(KERNAL_SIZE) - 1 : 0 ] offset_idx_q;
     logic [ $clog2(KERNAL_SIZE) : 0 ] row_count_q;
     e_state state_q; 
     logic in_row_last_q;
@@ -40,11 +41,13 @@ module max_pooling_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS
     logic reset_output_row;
     logic [VALUE_BITS - 1 : 0] next_out_row[OUT_WIDTH][CHANNELS];
     logic [ $clog2(OUT_WIDTH)-1 : 0 ] next_pos_idx;
+    logic [ $clog2(KERNAL_SIZE) - 1 : 0 ] next_offset_idx;
     logic [ $clog2(KERNAL_SIZE) : 0 ] next_row_count;
     e_state next_state;
 
     // Temp signals to use as local vriables inside of always_comb but who have no meaningful output value
     logic [ $clog2(WIDTH)-1 : 0 ] tmp_input_idx;
+    logic [ $clog2(OUT_WIDTH) : 0] tmp_out_idx;
 
     always_comb begin
         // Default values
@@ -57,6 +60,7 @@ module max_pooling_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS
         next_pos_idx = pos_idx_q;
         next_state = state_q;
         next_row_count = row_count_q;
+        next_offset_idx = offset_idx_q;
         // FSM logic
         case (state_q)
         S_GET_NEXT_ROW: begin
@@ -68,22 +72,29 @@ module max_pooling_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS
             end
         end
         S_CALC_ROW: begin
-            next_pos_idx = pos_idx_q + 1;
+            // Increment offset unless that goes out of bounds
+            // In which case increment the output pixel we are computing and reset offset
+            if (offset_idx_q == (KERNAL_SIZE-1)) begin
+                next_pos_idx = pos_idx_q + 1;
+                next_offset_idx = 0;
+            end else begin
+                next_offset_idx = offset_idx_q + 1;
+            end
+            
             // Actual computing of kernal
             for (int kernal_num = 0; kernal_num < NUM_KERNALS; kernal_num++) begin
                 // Each kernal computes one instance of kernal_width 
-                for (int offset = 0; offset < KERNAL_SIZE; offset++) begin
-                    // Compute location in input and make sure no roundoff errors (it must be in bounds)
-                    tmp_input_idx = pos_idx_q*KERNAL_SIZE + kernal_num*NUM_KERNALS/WIDTH + offset;
-                    if (tmp_input_idx < WIDTH) begin
-                        // For all channels we do this operation
-                        for (int ch_num = 0; ch_num < CHANNELS; ch_num++) begin
-                            // Update value we will write if it is greater than current values for row
-                            // TODO -- Need to use twos-compliment signed version of compare instead of unsigned
-                            // Actually probably need to check that I do that everywhere, everything is unsigned rn
-                            if (next_out_row[ pos_idx_q ][ch_num] < in_row_q[ tmp_input_idx ][ch_num] ) begin
-                                next_out_row[ pos_idx_q ][ch_num] = in_row_q[ tmp_input_idx ][ch_num];
-                            end
+                // Compute location in input and make sure no roundoff errors (it must be in bounds)
+                tmp_input_idx = pos_idx_q*KERNAL_SIZE + kernal_num*WIDTH/NUM_KERNALS + offset_idx_q;
+                if (tmp_input_idx < WIDTH) begin
+                    // For all channels we do this operation
+                    for (int ch_num = 0; ch_num < CHANNELS; ch_num++) begin
+                        // Update value we will write if it is greater than current values for row
+                        // TODO -- Need to use twos-compliment signed version of compare instead of unsigned
+                        // Actually probably need to check that I do that everywhere, everything is unsigned rn
+                        tmp_out_idx = pos_idx_q + kernal_num*OUT_WIDTH/NUM_KERNALS;
+                        if (next_out_row[ tmp_out_idx ][ch_num] < in_row_q[ tmp_input_idx ][ch_num] ) begin
+                            next_out_row[ tmp_out_idx ][ch_num] = in_row_q[ tmp_input_idx ][ch_num];
                         end
                     end
                 end
@@ -111,6 +122,7 @@ module max_pooling_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS
         end
         endcase
         tmp_input_idx = 0 ; //don't actually store a value here when exiting the always block
+        tmp_out_idx = 0;
     end
 
 
@@ -120,12 +132,14 @@ module max_pooling_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS
             pos_idx_q <= 0;
             in_row_last_q <= 0;
             row_count_q <= 0;
+            offset_idx_q <= 0;
         end else begin
             if (latch_in_row) begin
                 in_row_q <= in_row_i;
                 in_row_last_q <= in_row_last_i;
                 out_row_tag_o <= in_row_tag_i;
             end
+            offset_idx_q <= next_offset_idx;
             row_count_q <= next_row_count;
             out_row_q <= next_out_row;
             pos_idx_q <= next_pos_idx;
