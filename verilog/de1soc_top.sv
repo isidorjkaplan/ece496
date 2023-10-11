@@ -90,8 +90,6 @@ module de1soc_top(
         .out_row_tag_o(out_row_tag_o)
     );
 
-
-
     // POOL1 -> OUT glue logic
 
     logic [VALUE_BITS-1 : 0] out_row_par[OUTPUT_WIDTH*OUTPUT_CHANNELS];
@@ -99,10 +97,11 @@ module de1soc_top(
         .clock(clock), .reset(reset_i), 
         .in_data(out_row_par), .in_valid(out_row_valid_o),
         .out_data(out_data[23:0]), .out_valid(out_valid),
-        .downstream_stall(downstream_stall), .upstream_stall(out_row_accept_i)
+        .downstream_stall(downstream_stall), .upstream_stall(!out_row_accept_i)
     );
 
-    always_ff@(posedge clock) begin
+
+    always_comb begin
         if (reset_i) begin
             out_data[31:24] <= 0;
         end else if (out_row_valid_o && out_row_accept_i) begin

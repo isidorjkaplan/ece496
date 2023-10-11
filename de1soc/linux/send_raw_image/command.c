@@ -145,6 +145,8 @@ int main (int argc, char *argv[])
 	FIFO_write_ptr =(unsigned int *)(h2p_virtual_base);
 	FIFO_read_ptr = (unsigned int *)(h2p_virtual_base + 0x10); //0x10
 
+	// Send hard reset signal to the FPGA
+	FIFO_WRITE_BLOCK((1 << 31));
 	// give the FPGA time to finish working
 	usleep(30000);  
 	// Flush any initial contents on the Queue
@@ -158,38 +160,42 @@ int main (int argc, char *argv[])
 
 	const int X = 28;
 	const int Y = 28;
-	// This is a feature of the neural network architecture chosen
-	const int NUM_ROWS_FOR_VALID_OUTPUT = 28;
-	const int RESULT_WIDTH = 7;
+	
+	const int RESULT_WIDTH = 1;
+	const int RESULT_HEIGHT = 1;
 	const int RESULT_CHANNELS = 10;
 
-	int x, y;
-	int out_row_count = 0;
-
-	for (y = 0; y < Y; y++) {
-		for (x = 0; x < X; x++) {
-			FIFO_WRITE_BLOCK(x + 28*y);
-		}
-		printf("Wrote row=%d\n", y);
-		//just for now to make sure the CNN has fully settled and produced its output
-		// Avoids potential race condition
-		// That said I think in reality CNN is so fast that it produces a value before this program even can read it
-		usleep(100); 
-		
-		// Check if we have results
-		int count = 0;
-		while (!READ_FIFO_EMPTY) {
-			count++;
-			FIFO_READ;
-		}
-		if (count > 0) {
-			if (count != RESULT_WIDTH*RESULT_CHANNELS) {
-				printf("WARNING: Read more than %d != %d row results in row=%d!!!\n", x, RESULT_WIDTH*RESULT_CHANNELS, out_row_count);
-			} else {
-				printf("Read result row=%d\n", out_row_count);
+	int x, y, img_num;
+	for (img_num = 0; img_num < 2; img_num++) {
+		for (y = 0; y < Y; y++) {
+			for (x = 0; x < X; x++) {
+				// Write pixel data
+				FIFO_WRITE_BLOCK( 
+					((x + 28*y)&0xFF) 			// Pixel Data
+					| (((y==(Y-1))&0xFF)<<30)	// Last Row flag
+					| ((img_num&0xFF) << 24) 	// Image Tag
+				);
 			}
-			out_row_count++;
+			printf("Wrote row=%d\n", y);
 		}
+
+		for (y = 0; y < RESULT_HEIGHT; y++) {
+			for (x = 0; x < RESULT_WIDTH; x++) {
+				int ch;
+				for (ch = 0; ch < RESULT_CHANNELS; ch++) {
+					unsigned int data = FIFO_READ;
+					printf("Word=%x ", data);
+					unsigned int last = (data>>31)&1;
+					unsigned int pixel_value = data&0xFF;
+					unsigned int tag = (data>>24)&((1<<5)-1);
+					printf("Read (x,y)=(%d,%d), ch=%d, last=%d, tag=%d, value=%d\n", x, y, ch, last, tag, pixel_value);
+					assert(tag == img_num);
+					//assert(last == (y == RESULT_HEIGHT-1));
+
+				}
+			}
+		}
+		printf("Read %d resulting values\n", RESULT_HEIGHT*RESULT_WIDTH*RESULT_CHANNELS);
 	}
 
 	printf("Program Done\n");
