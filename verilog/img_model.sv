@@ -201,7 +201,7 @@ module cnn_top #(
                 for (int x = 0; x < LAYER0_KERNAL_SIZE; x++) begin
                     for (int y = 0; y < LAYER0_KERNAL_SIZE; y++) begin
                         layer0_kernal_weights_i[out_ch][in_ch][x][y] 
-                        = 1<<(WEIGHT_Q_SHIFT-$clog2(LAYER0_OUT_CHANNELS*LAYER0_IN_CHANNELS*LAYER0_KERNAL_SIZE*LAYER0_KERNAL_SIZE));
+                        = 1<<(WEIGHT_Q_SHIFT-$clog2(LAYER0_IN_CHANNELS*LAYER0_KERNAL_SIZE*LAYER0_KERNAL_SIZE));
                     end
                 end
             end
@@ -212,7 +212,7 @@ module cnn_top #(
                 for (int x = 0; x < LAYER1_KERNAL_SIZE; x++) begin
                     for (int y = 0; y < LAYER1_KERNAL_SIZE; y++) begin
                         layer1_kernal_weights_i[out_ch][in_ch][x][y] 
-                        = 1<<(WEIGHT_Q_SHIFT-$clog2(LAYER1_OUT_CHANNELS*LAYER1_IN_CHANNELS*LAYER1_KERNAL_SIZE*LAYER1_KERNAL_SIZE));
+                        = 1<<(WEIGHT_Q_SHIFT-$clog2(LAYER1_IN_CHANNELS*LAYER1_KERNAL_SIZE*LAYER1_KERNAL_SIZE));
                     end
                 end
             end
