@@ -13,6 +13,12 @@ module de1soc_top(
     input wire downstream_stall,
     output wire upstream_stall
 );
+    logic reset_i;
+    // Assign bit 31 of in_data to hard reset the circuit
+    assign reset_i = reset || (in_data[31] && in_valid);
+
+
+
     localparam VALUES_PER_WORD = 1;
     localparam VALUE_BITS = 8;
     localparam INPUT_WIDTH = 28, INPUT_CHANNELS=1;
@@ -29,11 +35,14 @@ module de1soc_top(
     // INPUT -> LAYER0 GLUE LOGIC
     logic [VALUE_BITS-1 : 0] in_row_par[INPUT_WIDTH*INPUT_CHANNELS];
 
+    logic upstream_stall_paralellize;
+    assign upstream_stall = upstream_stall_paralellize && !reset_i;
+
     parallelize #(.N(INPUT_WIDTH*INPUT_CHANNELS), .DATA_BITS(VALUE_BITS), .DATA_PER_WORD(VALUES_PER_WORD)) par2ser(
-        .clock(clock), .reset(reset), 
+        .clock(clock), .reset(reset_i), 
         .in_data(in_data), .in_valid(in_valid), 
         .out_data(in_row_par), .out_valid(in_row_valid_i),
-        .downstream_stall(!in_row_accept_o), .upstream_stall(upstream_stall)
+        .downstream_stall(!in_row_accept_o), .upstream_stall(upstream_stall_paralellize)
     );
     
     always_comb begin
@@ -47,7 +56,7 @@ module de1soc_top(
 
     cnn_top cnn(
         // General
-        .clock_i(clock), .reset_i(reset),
+        .clock_i(clock), .reset_i(reset_i),
         // INPUT INFO
         .in_row_i(in_row_i),
         .in_row_valid_i(in_row_valid_i),
@@ -67,7 +76,7 @@ module de1soc_top(
 
     logic [VALUE_BITS-1 : 0] out_row_par[OUTPUT_WIDTH*OUTPUT_CHANNELS];
     serialize #(.N(OUTPUT_WIDTH*OUTPUT_CHANNELS), .DATA_BITS(VALUE_BITS), .DATA_PER_WORD(VALUES_PER_WORD)) ser2par(
-        .clock(clock), .reset(reset), 
+        .clock(clock), .reset(reset_i), 
         .in_data(out_row_par), .in_valid(out_row_valid_o),
         .out_data(out_data), .out_valid(out_valid),
         .downstream_stall(downstream_stall), .upstream_stall(out_row_accept_i)

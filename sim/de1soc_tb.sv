@@ -32,12 +32,9 @@ module de1soc_tb();
 	// Control Flow
 	.downstream_stall(downstream_stall), .upstream_stall(upstream_stall));
 
-    task automatic write_values(input [7:0] values[VALUES_PER_WORD]);
+    task automatic send_word(logic [31:0] word);
     begin
-        in_data = 0;
-        for (int i = 0; i < VALUES_PER_WORD; i++) begin
-            in_data[ 8*i +: 8 ] = values[i];
-        end
+        in_data = word;
         in_valid = 1;
         #1
         while (upstream_stall) begin
@@ -56,6 +53,18 @@ module de1soc_tb();
         @(posedge clock);
     end
     endtask
+
+    task automatic write_values(input [7:0] values[VALUES_PER_WORD]);
+    begin
+        logic [31:0] word;
+        word = 0;
+        for (int i = 0; i < VALUES_PER_WORD; i++) begin
+            word[ 8*i +: 8 ] = values[i];
+        end
+        send_word(word);
+    end
+    endtask
+
 
     task automatic write_row(int N);
     begin
@@ -149,12 +158,16 @@ module de1soc_tb();
         @(posedge clock);
         reset = 0;
         @(posedge clock);
+        // Send reset signal encoded in the input data (this is how proc signals to flush the CNN pipeline) 
+        send_word({1'b1, 31'b0});
         for (int img_num = 0; img_num < 3; img_num++) begin
             for (int i = 0; i < 28; i++) begin
                 write_row(i);
                 $display("Wrote row %d", i);
             end
             wait_cycles(1000);
+            send_word({1'b1, 31'b0});
+            
         end
         $display("Writer thread finished");
         wait_cycles(1000);
