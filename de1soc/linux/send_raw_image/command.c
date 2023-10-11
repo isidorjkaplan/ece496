@@ -181,7 +181,7 @@ int main (int argc, char *argv[])
 		for (y = 0; y < RESULT_HEIGHT; y++) {
 			for (x = 0; x < RESULT_WIDTH; x++) {
 				int ch;
-				printf("Read (x,y)=(%d,%d) from img=%d is [");
+				printf("Read (x,y)=(%d,%d) from img=%d is [", x, y, img_num);
 
 				for (ch = 0; ch < RESULT_CHANNELS; ch++) {
 					unsigned int data = FIFO_READ;
