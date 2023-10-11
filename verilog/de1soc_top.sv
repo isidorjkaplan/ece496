@@ -46,11 +46,19 @@ module de1soc_top(
     );
     
     always_comb begin
-        in_row_last_i = 0;
         for (int x = 0; x < INPUT_WIDTH; x++) begin
             for (int in_ch = 0; in_ch < INPUT_CHANNELS; in_ch++) begin
                 in_row_i[x][in_ch] = in_row_par[x + in_ch*INPUT_WIDTH];
             end
+        end
+    end
+
+    always_ff@(posedge clock) begin
+        if (reset_i) begin
+            in_row_last_i <= 0;
+        end else if (in_valid && in_row_accept_o) begin
+            // 30th bit of in_data is reserved for last signal
+            in_row_last_i <= in_data[30];
         end
     end
 

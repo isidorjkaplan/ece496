@@ -54,26 +54,30 @@ module de1soc_tb();
     end
     endtask
 
-    task automatic write_values(input [7:0] values[VALUES_PER_WORD]);
+    task automatic write_values(input [7:0] values[VALUES_PER_WORD], logic [7:0] cntrl_byte);
     begin
         logic [31:0] word;
         word = 0;
         for (int i = 0; i < VALUES_PER_WORD; i++) begin
             word[ 8*i +: 8 ] = values[i];
         end
+        word[31:24] = cntrl_byte;
         send_word(word);
     end
     endtask
 
-
     task automatic write_row(int N);
     begin
         logic [7:0] values[VALUES_PER_WORD];
+        logic [7:0] cntrl_byte;
+        cntrl_byte = 0;
+        // in_row_last_i is the second last bit of cntrl byte
+        cntrl_byte[6] = N==IMG_WIDTH-1;
         for (int i = 0; i < IMG_WIDTH; i+=VALUES_PER_WORD) begin
             for (int j = 0; j < VALUES_PER_WORD; j++) begin
                 values[j] = i+j+N*IMG_WIDTH;
             end
-            write_values(values);
+            write_values(values, cntrl_byte);
         end
     end
     endtask
@@ -166,7 +170,6 @@ module de1soc_tb();
                 $display("Wrote row %d", i);
             end
             wait_cycles(1000);
-            send_word({1'b1, 31'b0});
             
         end
         $display("Writer thread finished");
