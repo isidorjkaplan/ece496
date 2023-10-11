@@ -1,4 +1,4 @@
-module max_pooling_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS, CHANNELS) (
+module max_pooling_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS, CHANNELS, TAG_WIDTH) (
     // General signals
     input clock_i, input reset_i,
     // next row logic
@@ -6,10 +6,12 @@ module max_pooling_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS
     input logic in_row_valid_i, 
     output logic in_row_accept_o, // must be high before in_row_i moves to next value
     input logic in_row_last_i,  // if raised we are done
+    input logic [TAG_WIDTH-1:0] in_row_tag_i,
     // output row valid 
     output logic [VALUE_BITS - 1 : 0] out_row_o[WIDTH/KERNAL_SIZE][CHANNELS],
     output logic out_row_valid_o,
     output logic out_row_last_o,
+    output logic [TAG_WIDTH-1:0] out_row_tag_o,
     input logic out_row_accept_i
 );
     // The state transitions for this layer
@@ -122,6 +124,7 @@ module max_pooling_layer #(parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS
             if (latch_in_row) begin
                 in_row_q <= in_row_i;
                 in_row_last_q <= in_row_last_i;
+                out_row_tag_o <= in_row_tag_i;
             end
             row_count_q <= next_row_count;
             out_row_q <= next_out_row;
@@ -145,7 +148,7 @@ endmodule
 
 
 module cnn_layer #(
-    parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS, WEIGHT_BITS, WEIGHT_Q_SHIFT, IN_CHANNELS, OUT_CHANNELS,
+    parameter KERNAL_SIZE, NUM_KERNALS, WIDTH, VALUE_BITS, WEIGHT_BITS, WEIGHT_Q_SHIFT, IN_CHANNELS, OUT_CHANNELS, TAG_WIDTH,
     localparam OUT_WIDTH = WIDTH - KERNAL_SIZE + 1
     ) (
     // General signals
@@ -157,10 +160,12 @@ module cnn_layer #(
     input logic in_row_valid_i, 
     output logic in_row_accept_o, // must be high before in_row_i moves to next value
     input logic in_row_last_i,  // if raised we are done
+    input logic [TAG_WIDTH-1:0] in_row_tag_i,
     // output row valid 
     output logic [VALUE_BITS -1 : 0] out_row_o[WIDTH - KERNAL_SIZE + 1][OUT_CHANNELS],
     output logic out_row_valid_o,
     output logic out_row_last_o,
+    output logic [TAG_WIDTH-1:0] out_row_tag_o,
     input logic out_row_accept_i
 );
 
@@ -197,6 +202,7 @@ module cnn_layer #(
     logic next_out_row_valid;
     logic next_out_row_last;
     logic [ $clog2(OUT_CHANNELS)-1 : 0 ] next_out_ch_idx; 
+    logic [TAG_WIDTH-1:0] next_out_tag; 
 
     // BUFFER LOGIC
     
@@ -234,6 +240,7 @@ module cnn_layer #(
         next_row_idx = row_idx_q;
         next_col_idx = col_idx_q;
         next_out_row = out_row_q;
+        next_out_tag = out_row_tag_o;
         next_out_row_valid = out_row_valid_q;
         next_out_row_last = out_row_last_q;
         next_out_ch_idx = out_ch_idx_q;
@@ -296,6 +303,7 @@ module cnn_layer #(
         end
         S_WAIT_ROW_READ: begin
             if (out_row_accept_i) begin
+                next_out_tag = in_row_tag_i;
                 next_state = S_GET_NEXT_ROW;
                 next_out_row_valid = 0;
                 next_out_row_last = 0;
@@ -313,6 +321,7 @@ module cnn_layer #(
             out_row_valid_q <= 0;
             out_row_last_q <= 0;
             out_ch_idx_q <= 0;
+            out_row_tag_o <= 0;
         end else begin
             state_q <= next_state;
             row_idx_q <= next_row_idx;
@@ -321,6 +330,7 @@ module cnn_layer #(
             out_row_valid_q <= next_out_row_valid;
             out_row_last_q <= next_out_row_last;
             out_ch_idx_q <= next_out_ch_idx;
+            out_row_tag_o <= next_out_tag;
         end
     end
 

@@ -3,7 +3,7 @@
 // Input is streamed where we recieve an image as 28*28 individual transfers with the grayscale values
 module cnn_top #(
     parameter VALUE_BITS = 8,
-    localparam INPUT_WIDTH = 28, INPUT_CHANNELS=1, OUTPUT_WIDTH = 1, OUTPUT_CHANNELS = 10
+    localparam INPUT_WIDTH = 28, INPUT_CHANNELS=1, OUTPUT_WIDTH = 1, OUTPUT_CHANNELS = 10, TAG_WIDTH = 6
 )(
     // General signals
     input clock_i, input reset_i,
@@ -12,10 +12,12 @@ module cnn_top #(
     input logic in_row_valid_i, 
     output logic in_row_accept_o, // must be high before in_row_i moves to next value
     input logic in_row_last_i,  // if raised we are done
+    input logic [TAG_WIDTH-1:0] in_row_tag_i,
     // output row valid 
     output logic [VALUE_BITS - 1 : 0] out_row_o[OUTPUT_WIDTH][OUTPUT_CHANNELS],
     output logic out_row_valid_o,
     output logic out_row_last_o,
+    output logic [TAG_WIDTH-1:0] out_row_tag_o,
     input logic out_row_accept_i
 );    
     parameter WEIGHT_BITS=8;
@@ -33,6 +35,7 @@ module cnn_top #(
     logic  [ WEIGHT_BITS-1 : 0 ] layer0_kernal_weights_i[LAYER0_OUT_CHANNELS][LAYER0_IN_CHANNELS][LAYER0_KERNAL_SIZE][LAYER0_KERNAL_SIZE];
     
     logic [VALUE_BITS -1 : 0] layer0_out_row_o[LAYER0_OUT_WIDTH][LAYER0_OUT_CHANNELS];
+    logic [TAG_WIDTH-1:0] layer0_out_row_tag_o; 
     logic layer0_out_row_valid_o;
     logic layer0_out_row_accept_i;
     logic layer0_out_row_last_o;
@@ -40,7 +43,7 @@ module cnn_top #(
     cnn_layer #(
         .KERNAL_SIZE(LAYER0_KERNAL_SIZE), .NUM_KERNALS(LAYER0_NUM_KERNALS), 
         .WIDTH(LAYER0_WIDTH), .VALUE_BITS(VALUE_BITS), .WEIGHT_BITS(WEIGHT_BITS), .WEIGHT_Q_SHIFT(WEIGHT_Q_SHIFT), 
-        .IN_CHANNELS(LAYER0_IN_CHANNELS), .OUT_CHANNELS(LAYER0_OUT_CHANNELS)
+        .IN_CHANNELS(LAYER0_IN_CHANNELS), .OUT_CHANNELS(LAYER0_OUT_CHANNELS), .TAG_WIDTH(TAG_WIDTH)
     ) layer0(
         // General
         .clock_i(clock_i), .reset_i(reset_i),
@@ -50,10 +53,12 @@ module cnn_top #(
         .in_row_valid_i(in_row_valid_i),
         .in_row_accept_o(in_row_accept_o),
         .in_row_last_i(in_row_last_i),
+        .in_row_tag_i(in_row_tag_i),
         // OUT INFO
         .out_row_o(layer0_out_row_o),
         .out_row_valid_o(layer0_out_row_valid_o),
         .out_row_accept_i(layer0_out_row_accept_i),
+        .out_row_tag_o(layer0_out_row_tag_o),
         .out_row_last_o(layer0_out_row_last_o)
     );
 
@@ -72,10 +77,11 @@ module cnn_top #(
     logic pool0_out_row_valid_o;
     logic pool0_out_row_accept_i;
     logic pool0_out_row_last_o;
+    logic [TAG_WIDTH-1:0] pool0_out_row_tag_o; 
 
     max_pooling_layer #(
         .KERNAL_SIZE(POOL0_KERNAL_SIZE), .NUM_KERNALS(POOL0_NUM_KERNALS), 
-        .WIDTH(POOL0_WIDTH), .VALUE_BITS(VALUE_BITS), .CHANNELS(POOL0_CHANNELS)
+        .WIDTH(POOL0_WIDTH), .VALUE_BITS(VALUE_BITS), .CHANNELS(POOL0_CHANNELS), .TAG_WIDTH(TAG_WIDTH)
     ) pool0 (
         // General
         .clock_i(clock_i), .reset_i(reset_i),
@@ -84,11 +90,13 @@ module cnn_top #(
         .in_row_valid_i(pool0_in_row_valid_i),
         .in_row_accept_o(pool0_in_row_accept_o),
         .in_row_last_i(pool0_in_row_last_i),
+        .in_row_tag_i(layer0_out_row_tag_o),
         // OUT INFO
         .out_row_o(pool0_out_row_o),
         .out_row_valid_o(pool0_out_row_valid_o),
         .out_row_accept_i(pool0_out_row_accept_i),
-        .out_row_last_o(pool0_out_row_last_o)
+        .out_row_last_o(pool0_out_row_last_o),
+        .out_row_tag_o(pool0_out_row_tag_o)
     );
 
     // LAYER0 -> POOL0 GLUE LOGIC
@@ -115,11 +123,12 @@ module cnn_top #(
     logic layer1_out_row_valid_o;
     logic layer1_out_row_accept_i;
     logic layer1_out_row_last_o;
+    logic [TAG_WIDTH-1:0] layer1_out_row_tag_o; 
     
     cnn_layer #(
         .KERNAL_SIZE(LAYER1_KERNAL_SIZE), .NUM_KERNALS(LAYER1_NUM_KERNALS), 
         .WIDTH(LAYER1_WIDTH), .VALUE_BITS(VALUE_BITS), .WEIGHT_BITS(WEIGHT_BITS), .WEIGHT_Q_SHIFT(WEIGHT_Q_SHIFT), 
-        .IN_CHANNELS(LAYER1_IN_CHANNELS), .OUT_CHANNELS(LAYER1_OUT_CHANNELS)
+        .IN_CHANNELS(LAYER1_IN_CHANNELS), .OUT_CHANNELS(LAYER1_OUT_CHANNELS), .TAG_WIDTH(TAG_WIDTH)
     ) layer1(
         // General
         .clock_i(clock_i), .reset_i(reset_i),
@@ -129,11 +138,13 @@ module cnn_top #(
         .in_row_valid_i(layer1_in_row_valid_i),
         .in_row_accept_o(layer1_in_row_accept_o),
         .in_row_last_i(layer1_in_row_last_i),
+        .in_row_tag_i(pool0_out_row_tag_o),
         // OUT INFO
         .out_row_o(layer1_out_row_o),
         .out_row_valid_o(layer1_out_row_valid_o),
         .out_row_accept_i(layer1_out_row_accept_i),
-        .out_row_last_o(layer1_out_row_last_o)
+        .out_row_last_o(layer1_out_row_last_o),
+        .out_row_tag_o(layer1_out_row_tag_o)
     );
 
     // POOL0 -> LAYER1
@@ -153,9 +164,10 @@ module cnn_top #(
     logic [VALUE_BITS - 1 : 0] pool1_in_row_i[POOL1_WIDTH][POOL1_CHANNELS];
     logic pool1_in_row_valid_i, pool1_in_row_accept_o, pool1_in_row_last_i;
 
+
     max_pooling_layer #(
         .KERNAL_SIZE(POOL1_KERNAL_SIZE), .NUM_KERNALS(POOL1_NUM_KERNALS), 
-        .WIDTH(POOL1_WIDTH), .VALUE_BITS(VALUE_BITS), .CHANNELS(POOL1_CHANNELS)
+        .WIDTH(POOL1_WIDTH), .VALUE_BITS(VALUE_BITS), .CHANNELS(POOL1_CHANNELS), .TAG_WIDTH(TAG_WIDTH)
     ) pool1 (
         // General
         .clock_i(clock_i), .reset_i(reset_i),
@@ -164,11 +176,13 @@ module cnn_top #(
         .in_row_valid_i(pool1_in_row_valid_i),
         .in_row_accept_o(pool1_in_row_accept_o),
         .in_row_last_i(pool1_in_row_last_i),
+        .in_row_tag_i(layer0_out_row_tag_o),
         // OUT INFO
         .out_row_o(out_row_o),
         .out_row_valid_o(out_row_valid_o),
         .out_row_accept_i(out_row_accept_i),
-        .out_row_last_o(out_row_last_o)
+        .out_row_last_o(out_row_last_o),
+        .out_row_tag_o(out_row_tag_o)
     );
 
     // LAYER1 -> POOL1 GLUE LOGIC

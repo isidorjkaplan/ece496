@@ -24,6 +24,8 @@ module de1soc_tb();
     int timed_out;
     int read_count;
 
+    int last_read_tag = -1;
+
     de1soc_top dut(.clock(clock), .reset(reset), 
 	// Inputs
 	.in_data(in_data), .in_valid(in_valid),
@@ -66,13 +68,14 @@ module de1soc_tb();
     end
     endtask
 
-    task automatic write_row(int N);
+    task automatic write_row(int N, logic [5:0] tag);
     begin
         logic [7:0] values[VALUES_PER_WORD];
         logic [7:0] cntrl_byte;
         cntrl_byte = 0;
         // in_row_last_i is the second last bit of cntrl byte
         cntrl_byte[6] = N==IMG_WIDTH-1;
+        cntrl_byte[5:0] = tag;
         for (int i = 0; i < IMG_WIDTH; i+=VALUES_PER_WORD) begin
             for (int j = 0; j < VALUES_PER_WORD; j++) begin
                 values[j] = i+j+N*IMG_WIDTH;
@@ -84,6 +87,7 @@ module de1soc_tb();
 
     task automatic read_next_value(int timeout);
     begin
+        int tag_value;
         int count = timeout;
         timed_out = 0;
         // Ready to read
@@ -101,6 +105,11 @@ module de1soc_tb();
             #1;
         end
         //$display("Reading 32'h%x", out_data);
+        tag_value =  out_data[29:24];
+        if (tag_value != last_read_tag) begin
+            last_read_tag = tag_value;
+            $display("Read new tag value = %d", tag_value);
+        end
         @(posedge clock);
         downstream_stall = 1;
         @(posedge clock);
@@ -166,7 +175,7 @@ module de1soc_tb();
         send_word({1'b1, 31'b0});
         for (int img_num = 0; img_num < 3; img_num++) begin
             for (int i = 0; i < 28; i++) begin
-                write_row(i);
+                write_row(i, img_num);
                 $display("Wrote row %d", i);
             end
             wait_cycles(1000);

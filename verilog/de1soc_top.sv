@@ -17,6 +17,21 @@ module de1soc_top(
     // Assign bit 31 of in_data to hard reset the circuit
     assign reset_i = reset || (in_data[31] && in_valid);
 
+    logic cntrl_last;
+    localparam TAG_WIDTH = 6;
+    logic [TAG_WIDTH-1:0] img_tag;
+
+    always_ff@(posedge clock) begin
+        if (reset_i) begin
+            cntrl_last <= 0;
+            img_tag <= 0;
+        end else if (in_valid && !upstream_stall) begin
+            // 30th bit of in_data is reserved for last signal
+            cntrl_last <= in_data[30];
+            img_tag <= in_data[29:24];
+        end
+    end
+
 
 
     localparam VALUES_PER_WORD = 1;
@@ -26,21 +41,25 @@ module de1soc_top(
 
     logic [VALUE_BITS - 1 : 0] in_row_i[INPUT_WIDTH][INPUT_CHANNELS];
     logic in_row_valid_i, in_row_accept_o, in_row_last_i;
+    logic [TAG_WIDTH-1:0] in_row_tag_i;
+    assign in_row_tag_i = img_tag;
     
     logic [VALUE_BITS - 1 : 0] out_row_o[OUTPUT_WIDTH][OUTPUT_CHANNELS];
     logic out_row_valid_o;
     logic out_row_accept_i;
     logic out_row_last_o;
+    logic [TAG_WIDTH-1:0] out_row_tag_o;
 
     // INPUT -> LAYER0 GLUE LOGIC
     logic [VALUE_BITS-1 : 0] in_row_par[INPUT_WIDTH*INPUT_CHANNELS];
 
     logic upstream_stall_paralellize;
     assign upstream_stall = upstream_stall_paralellize && !reset_i;
+    assign in_row_last_i = cntrl_last;
 
-    parallelize #(.N(INPUT_WIDTH*INPUT_CHANNELS), .DATA_BITS(VALUE_BITS), .DATA_PER_WORD(VALUES_PER_WORD)) par2ser(
+    parallelize #(.N(INPUT_WIDTH*INPUT_CHANNELS), .DATA_BITS(VALUE_BITS), .DATA_PER_WORD(VALUES_PER_WORD), .WORD_SIZE(24)) par2ser(
         .clock(clock), .reset(reset_i), 
-        .in_data(in_data), .in_valid(in_valid), 
+        .in_data(in_data[23:0]), .in_valid(in_valid), 
         .out_data(in_row_par), .out_valid(in_row_valid_i),
         .downstream_stall(!in_row_accept_o), .upstream_stall(upstream_stall_paralellize)
     );
@@ -53,14 +72,6 @@ module de1soc_top(
         end
     end
 
-    always_ff@(posedge clock) begin
-        if (reset_i) begin
-            in_row_last_i <= 0;
-        end else if (in_valid && in_row_accept_o) begin
-            // 30th bit of in_data is reserved for last signal
-            in_row_last_i <= in_data[30];
-        end
-    end
 
     cnn_top cnn(
         // General
@@ -70,25 +81,37 @@ module de1soc_top(
         .in_row_valid_i(in_row_valid_i),
         .in_row_accept_o(in_row_accept_o),
         .in_row_last_i(in_row_last_i),
+        .in_row_tag_i(in_row_tag_i),
         // OUT INFO
         .out_row_o(out_row_o),
         .out_row_valid_o(out_row_valid_o),
         .out_row_accept_i(out_row_accept_i),
-        .out_row_last_o(out_row_last_o)
+        .out_row_last_o(out_row_last_o),
+        .out_row_tag_o(out_row_tag_o)
     );
 
 
 
     // POOL1 -> OUT glue logic
 
-
     logic [VALUE_BITS-1 : 0] out_row_par[OUTPUT_WIDTH*OUTPUT_CHANNELS];
-    serialize #(.N(OUTPUT_WIDTH*OUTPUT_CHANNELS), .DATA_BITS(VALUE_BITS), .DATA_PER_WORD(VALUES_PER_WORD)) ser2par(
+    serialize #(.N(OUTPUT_WIDTH*OUTPUT_CHANNELS), .DATA_BITS(VALUE_BITS), .DATA_PER_WORD(VALUES_PER_WORD), .WORD_SIZE(24)) ser2par(
         .clock(clock), .reset(reset_i), 
         .in_data(out_row_par), .in_valid(out_row_valid_o),
-        .out_data(out_data), .out_valid(out_valid),
+        .out_data(out_data[23:0]), .out_valid(out_valid),
         .downstream_stall(downstream_stall), .upstream_stall(out_row_accept_i)
     );
+
+    always_ff@(posedge clock) begin
+        if (reset_i) begin
+            out_data[31:24] <= 0;
+        end else if (out_row_valid_o && out_row_accept_i) begin
+            out_data[31] <= 0; //this bit is never 1
+            out_data[30] <= out_row_last_o;
+            out_data[29:24] <= out_row_tag_o;
+        end
+    end
+
     always_comb begin
         for (int x = 0; x < OUTPUT_WIDTH; x++) begin
             for (int out_ch = 0; out_ch < OUTPUT_CHANNELS; out_ch++) begin
