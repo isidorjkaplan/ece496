@@ -185,13 +185,13 @@ int main (int argc, char *argv[])
 
 				for (ch = 0; ch < RESULT_CHANNELS; ch++) {
 					unsigned int data = FIFO_READ;
-					unsigned int last = (data>>31)&1;
+					unsigned int last = (data>>30)&1;
 					unsigned int pixel_value = data&0xFF;
 					unsigned int tag = (data>>24)&((1<<5)-1);
 					//printf("Read (x,y)=(%d,%d), ch=%d, last=%d, tag=%d, value=%d\n", x, y, ch, last, tag, pixel_value);
 					printf("%d, ", pixel_value);
 					assert(tag == img_num);
-					//assert(last == (y == RESULT_HEIGHT-1));
+					assert(last == (y == RESULT_HEIGHT-1));
 				}
 				printf("]\n");
 			}
