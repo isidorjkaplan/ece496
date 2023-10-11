@@ -24,7 +24,7 @@ module de1soc_tb();
     int timed_out;
     int read_count;
 
-    cnn_top #(.VALUES_PER_WORD(VALUES_PER_WORD)) dut(.clock(clock), .reset(reset), 
+    de1soc_top dut(.clock(clock), .reset(reset), 
 	// Inputs
 	.in_data(in_data), .in_valid(in_valid),
 	// Outputs

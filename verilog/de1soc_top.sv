@@ -13,12 +13,74 @@ module de1soc_top(
     input wire downstream_stall,
     output wire upstream_stall
 );
-    cnn_top cnn(
+    localparam VALUES_PER_WORD = 1;
+    localparam VALUE_BITS = 8;
+    localparam INPUT_WIDTH = 28, INPUT_CHANNELS=1;
+    localparam OUTPUT_WIDTH = 1, OUTPUT_CHANNELS = 10;
+
+    logic [VALUE_BITS - 1 : 0] in_row_i[INPUT_WIDTH][INPUT_CHANNELS];
+    logic in_row_valid_i, in_row_accept_o, in_row_last_i;
+    
+    logic [VALUE_BITS - 1 : 0] out_row_o[OUTPUT_WIDTH][OUTPUT_CHANNELS];
+    logic out_row_valid_o;
+    logic out_row_accept_i;
+    logic out_row_last_o;
+
+    // INPUT -> LAYER0 GLUE LOGIC
+    logic [VALUE_BITS-1 : 0] in_row_par[INPUT_WIDTH*INPUT_CHANNELS];
+
+    parallelize #(.N(INPUT_WIDTH*INPUT_CHANNELS), .DATA_BITS(VALUE_BITS), .DATA_PER_WORD(VALUES_PER_WORD)) par2ser(
         .clock(clock), .reset(reset), 
         .in_data(in_data), .in_valid(in_valid), 
-        .out_data(out_data), .out_valid(out_valid), 
-        .downstream_stall(downstream_stall), .upstream_stall(upstream_stall)
+        .out_data(in_row_par), .out_valid(in_row_valid_i),
+        .downstream_stall(!in_row_accept_o), .upstream_stall(upstream_stall)
     );
+    
+    always_comb begin
+        in_row_last_i = 0;
+        for (int x = 0; x < INPUT_WIDTH; x++) begin
+            for (int in_ch = 0; in_ch < INPUT_CHANNELS; in_ch++) begin
+                in_row_i[x][in_ch] = in_row_par[x + in_ch*INPUT_WIDTH];
+            end
+        end
+    end
+
+    cnn_top cnn(
+        // General
+        .clock_i(clock), .reset_i(reset),
+        // INPUT INFO
+        .in_row_i(in_row_i),
+        .in_row_valid_i(in_row_valid_i),
+        .in_row_accept_o(in_row_accept_o),
+        .in_row_last_i(in_row_last_i),
+        // OUT INFO
+        .out_row_o(out_row_o),
+        .out_row_valid_o(out_row_valid_o),
+        .out_row_accept_i(out_row_accept_i),
+        .out_row_last_o(out_row_last_o)
+    );
+
+
+
+    // POOL1 -> OUT glue logic
+
+
+    logic [VALUE_BITS-1 : 0] out_row_par[OUTPUT_WIDTH*OUTPUT_CHANNELS];
+    serialize #(.N(OUTPUT_WIDTH*OUTPUT_CHANNELS), .DATA_BITS(VALUE_BITS), .DATA_PER_WORD(VALUES_PER_WORD)) ser2par(
+        .clock(clock), .reset(reset), 
+        .in_data(out_row_par), .in_valid(out_row_valid_o),
+        .out_data(out_data), .out_valid(out_valid),
+        .downstream_stall(downstream_stall), .upstream_stall(out_row_accept_i)
+    );
+    always_comb begin
+        for (int x = 0; x < OUTPUT_WIDTH; x++) begin
+            for (int out_ch = 0; out_ch < OUTPUT_CHANNELS; out_ch++) begin
+                out_row_par[x + out_ch*OUTPUT_WIDTH] = out_row_o[x][out_ch];
+            end
+        end
+    end
+
+
 endmodule 
 
 module parallelize #(parameter N, DATA_BITS, DATA_PER_WORD, WORD_SIZE=32) (
