@@ -156,25 +156,40 @@ int main (int argc, char *argv[])
 
 	printf("Flushed FIFO read queue with %d elements\n", read_count);
 
-	int x, y;
+	const int X = 28;
+	const int Y = 28;
+	// This is a feature of the neural network architecture chosen
+	const int NUM_ROWS_FOR_VALID_OUTPUT = 28;
+	const int RESULT_WIDTH = 7;
+	const int RESULT_CHANNELS = 10;
 
-	for (y = 0; y < 28; y++) {
-		for (x = 0; x < 28; x++) {
+	int x, y;
+	int out_row_count = 0;
+
+	for (y = 0; y < Y; y++) {
+		for (x = 0; x < X; x++) {
 			FIFO_WRITE_BLOCK(x + 28*y);
 		}
 		printf("Wrote row=%d\n", y);
-		if (y >= 2) {
-			for (x = 0; x < 28; x++) {
-				while (!READ_FIFO_EMPTY) {
-					x++;
-					FIFO_READ;
-				}
-				if (x > 28) {
-					printf("WARNING: Read more than 28 row results!!!\n");
-				}
+		//just for now to make sure the CNN has fully settled and produced its output
+		// Avoids potential race condition
+		// That said I think in reality CNN is so fast that it produces a value before this program even can read it
+		usleep(100); 
+		
+		// Check if we have results
+		int count = 0;
+		while (!READ_FIFO_EMPTY) {
+			count++;
+			FIFO_READ;
+		}
+		if (count > 0) {
+			if (count != RESULT_WIDTH*RESULT_CHANNELS) {
+				printf("WARNING: Read more than %d != %d row results in row=%d!!!\n", x, RESULT_WIDTH*RESULT_CHANNELS, out_row_count);
+			} else {
+				printf("Read result row=%d\n", out_row_count);
 			}
-			printf("Read result row=%d\n", y-2);
-		}	
+			out_row_count++;
+		}
 	}
 
 	printf("Program Done\n");

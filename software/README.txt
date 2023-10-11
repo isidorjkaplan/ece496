@@ -1,1 +1,1 @@
-Trevor put software implementation here
+Client and server. Server software goes on DE1-SoC
