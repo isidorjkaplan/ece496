@@ -166,33 +166,34 @@ int main (int argc, char *argv[])
 	const int RESULT_CHANNELS = 10;
 
 	int x, y, img_num;
-	for (img_num = 0; img_num < 2; img_num++) {
+	for (img_num = 0; img_num < 10; img_num++) {
 		for (y = 0; y < Y; y++) {
 			for (x = 0; x < X; x++) {
 				// Write pixel data
 				FIFO_WRITE_BLOCK( 
-					((x + 28*y)&0xFF) 			// Pixel Data
+					((x + y/2 + img_num)&0xFF) 			// Pixel Data
 					| (((y==(Y-1))&0xFF)<<30)	// Last Row flag
 					| ((img_num&0xFF) << 24) 	// Image Tag
 				);
 			}
-			printf("Wrote row=%d\n", y);
 		}
-
+		printf("Wrote image %d\n", img_num);
 		for (y = 0; y < RESULT_HEIGHT; y++) {
 			for (x = 0; x < RESULT_WIDTH; x++) {
 				int ch;
+				printf("Read (x,y)=(%d,%d) from img=%d is [");
+
 				for (ch = 0; ch < RESULT_CHANNELS; ch++) {
 					unsigned int data = FIFO_READ;
-					printf("Word=%x ", data);
 					unsigned int last = (data>>31)&1;
 					unsigned int pixel_value = data&0xFF;
 					unsigned int tag = (data>>24)&((1<<5)-1);
-					printf("Read (x,y)=(%d,%d), ch=%d, last=%d, tag=%d, value=%d\n", x, y, ch, last, tag, pixel_value);
+					//printf("Read (x,y)=(%d,%d), ch=%d, last=%d, tag=%d, value=%d\n", x, y, ch, last, tag, pixel_value);
+					printf("%d, ", pixel_value);
 					assert(tag == img_num);
 					//assert(last == (y == RESULT_HEIGHT-1));
-
 				}
+				printf("]\n");
 			}
 		}
 		printf("Read %d resulting values\n", RESULT_HEIGHT*RESULT_WIDTH*RESULT_CHANNELS);
