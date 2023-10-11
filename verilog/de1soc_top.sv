@@ -93,15 +93,17 @@ module de1soc_top(
     // POOL1 -> OUT glue logic
 
     logic [VALUE_BITS-1 : 0] out_row_par[OUTPUT_WIDTH*OUTPUT_CHANNELS];
+    wire upstream_stall_serial;
+    assign out_row_accept_i = !upstream_stall_serial;
     serialize #(.N(OUTPUT_WIDTH*OUTPUT_CHANNELS), .DATA_BITS(VALUE_BITS), .DATA_PER_WORD(VALUES_PER_WORD), .WORD_SIZE(24)) ser2par(
         .clock(clock), .reset(reset_i), 
         .in_data(out_row_par), .in_valid(out_row_valid_o),
         .out_data(out_data[23:0]), .out_valid(out_valid),
-        .downstream_stall(downstream_stall), .upstream_stall(!out_row_accept_i)
+        .downstream_stall(downstream_stall), .upstream_stall(upstream_stall_serial)
     );
 
 
-    always_comb begin
+    always_ff@(posedge clock) begin
         if (reset_i) begin
             out_data[31:24] <= 0;
         end else if (out_row_valid_o && out_row_accept_i) begin
