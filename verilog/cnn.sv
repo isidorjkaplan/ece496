@@ -177,7 +177,7 @@ module cnn_layer #(
     input logic in_row_last_i,  // if raised we are done
     input logic [TAG_WIDTH-1:0] in_row_tag_i,
     // output row valid 
-    output logic [VALUE_BITS -1 : 0] out_row_o[WIDTH - KERNAL_SIZE + 1][OUT_CHANNELS],
+    output logic [VALUE_BITS -1 : 0] out_row_o[OUT_WIDTH][OUT_CHANNELS],
     output logic out_row_valid_o,
     output logic out_row_last_o,
     output logic [TAG_WIDTH-1:0] out_row_tag_o,
@@ -191,23 +191,23 @@ module cnn_layer #(
         S_WAIT_ROW_READ
     } e_state;
 
-    // buffer registers
+    // CNN PERSISTANT STATE
     e_state state_q; // for what mode we are in
-    logic [7 : 0] row_idx_q; // what row number is the next row we shift in
-    logic [ $clog2(WIDTH)-1 : 0] col_idx_q; // what column is at zero (aka, how many times have we shifted
+    logic [7 : 0] row_idx_q; // pointer to the next index we load a row into
+    logic [ $clog2(WIDTH)-1 : 0] col_idx_q; // represents an offset of the kernal over the input image 
     logic [VALUE_BITS -1 : 0] out_row_q[OUT_WIDTH][OUT_CHANNELS];
     logic out_row_valid_q;
     logic out_row_last_q;
     logic [ $clog2(OUT_CHANNELS)-1 : 0 ] out_ch_idx_q; 
     logic [TAG_WIDTH-1:0] out_row_tag_q;
 
-    // For simple output ports
+    // OUTPUT SIGNALS -- For simple output ports that are based on persistant state
     assign out_row_o = out_row_q;
     assign out_row_valid_o = out_row_valid_q;
     assign out_row_last_o = out_row_last_q;
     assign out_row_tag_o = out_row_tag_q;
 
-    // buffer signals
+    // COMBINATIONAL SIGNALS -- buffer signals, combinational
     e_state next_state;
     logic [7 : 0] next_row_idx;
     logic [ $clog2(WIDTH)-1 : 0] next_col_idx;
@@ -216,8 +216,9 @@ module cnn_layer #(
     logic next_out_row_last;
     logic [ $clog2(OUT_CHANNELS)-1 : 0 ] next_out_ch_idx; 
     logic [TAG_WIDTH-1:0] next_out_tag; 
+    logic [ 7 : 0 ] tmp_idx;
 
-    // BUFFER LOGIC
+    // BUFFER LOGIC -- Recieves rows shifted in vertically, and can also horizontally shift the "output taps" which is what the kernal will read
     
     logic buffer_shift_horiz, buffer_shift_vert;
     logic [ VALUE_BITS-1 : 0 ] buffer_taps[NUM_KERNALS][IN_CHANNELS][KERNAL_SIZE][KERNAL_SIZE];
@@ -230,11 +231,10 @@ module cnn_layer #(
     );
 
     // KERNAL LOGIC
-    logic [ VALUE_BITS-1 : 0 ] kernal_arr_output [NUM_KERNALS];
 
-    // Temp signals
-    logic [ 7 : 0 ] tmp_idx;
+    logic [ VALUE_BITS-1 : 0 ] kernal_arr_output [NUM_KERNALS]; // Output for each instance of the kernal stamped
 
+    // instance of an array of kernals, each computing one output channel per cycle stamped at various locations
     kernal_array #(
         .KERNAL_SIZE(KERNAL_SIZE), .NUM_KERNALS(NUM_KERNALS),
         .WEIGHT_BITS(WEIGHT_BITS), .WEIGHT_Q_SHIFT(WEIGHT_Q_SHIFT),
@@ -245,7 +245,6 @@ module cnn_layer #(
         .kernal_weights_i(kernal_weights_i[out_ch_idx_q]), .image_values_i(buffer_taps), 
         .output_values_o(kernal_arr_output)
     );
-
 
     // Buffer combinational FSM logic
     always_comb begin
@@ -269,9 +268,8 @@ module cnn_layer #(
                 next_row_idx = row_idx_q + 1;
                 in_row_accept_o = 1;
                 //if this is the last row so after we are starting next image
-                if (in_row_last_i) begin
-                    next_out_row_last = 1;
-                end
+                next_out_row_last = in_row_last_i;
+                next_out_tag = in_row_tag_i;
                 // Change state to be calculating over that row
                 if (row_idx_q >= KERNAL_SIZE-1) begin
                     next_state = S_KERNAL_COMPUTE;
@@ -284,7 +282,10 @@ module cnn_layer #(
             // Latch the output of the current output_channel / current pixel
             for (int kernal_num = 0; kernal_num < NUM_KERNALS; kernal_num++) begin
                 tmp_idx = (kernal_num*WIDTH/NUM_KERNALS) +  col_idx_q;
-                 // Bounds check before writing to output (for fringing effects)
+                 // Bounds check before writing to output (for fringing effects around the edges)
+                 // Since we must do WIDTH rotations but have OUT_WIDTH output ports, the last KERNAL_SIZE-1 outputs
+                 // are invalid but must be marched over anyways to restore buffer for vertical shift
+                 // so we just ignore their outputs and not latch them (the kernal is over the image boundry here)
                 if (tmp_idx < OUT_WIDTH) begin
                     next_out_row[ tmp_idx ][out_ch_idx_q] = kernal_arr_output[kernal_num];
                 end
@@ -293,7 +294,7 @@ module cnn_layer #(
             next_out_ch_idx = out_ch_idx_q + 1;
 
             // If this was the last value in this channel than we must move to the next pixel and reset channel
-            if (out_ch_idx_q >= OUT_CHANNELS-1) begin
+            if (out_ch_idx_q == OUT_CHANNELS-1) begin
                 // Channel is back to channel 0
                 next_out_ch_idx = 0;
                 // Shift so that we get next pixel
@@ -302,17 +303,21 @@ module cnn_layer #(
                 next_col_idx = col_idx_q + 1;                
                 // If this was the last pixel than we must go and read the next row
                 if (next_col_idx*NUM_KERNALS >= WIDTH) begin
+                    // Mark the output row as valid and wait for it to be read before we can proceed
                     next_state = S_WAIT_ROW_READ;
                     next_out_row_valid = 1;
+                    // If this was the last row, reset row index (i.e no valid rows in buffer)
                     if (out_row_last_o) begin
                         next_row_idx = 0;
                     end
                 end
             end
         end
+        // Wait for our computed result to be read 
         S_WAIT_ROW_READ: begin
+            // If the next stage accepts our result
             if (out_row_accept_i) begin
-                next_out_tag = in_row_tag_i;
+                // Transition to reading in the next row, mark output as no longer valid
                 next_state = S_GET_NEXT_ROW;
                 next_out_row_valid = 0;
                 next_out_row_last = 0;
@@ -344,8 +349,6 @@ module cnn_layer #(
             out_row_tag_q <= next_out_tag;
         end
     end
-
-    //TODO to make sure does not get optimized away
 
 endmodule 
 
@@ -381,12 +384,16 @@ module shift_buffer_array #(parameter WIDTH, HEIGHT, TAP_WIDTH, NUM_TAPS, VALUE_
 
     // State update to the buffer
     always_ff@(posedge clock_i) begin
+        // Perform a row-shift with our new row at the top and the old row shifted out
+        // This represents the vertical slice of the imace that our kernal is marching over right now
         if (shift_vert_i) begin
             for (int row = 0; row < HEIGHT-1; row++)  begin
                 buffer_q[row] <= buffer_q[row+1];
             end
             buffer_q[HEIGHT-1] <= next_row_i;
-
+        // This represents a rotation horizontally of the data within each row. 
+        // We do that to simulate the kernal marching horizontally over the image
+        // At the end of WIDTH rotations we are back where we started and can do vertical shift
         end else if (shift_horiz_i) begin
             for (int row = 0; row < HEIGHT; row++) begin
                 for (int col = 0; col < WIDTH-1; col++) begin
