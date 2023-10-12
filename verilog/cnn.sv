@@ -187,7 +187,6 @@ module cnn_layer #(
     // BUFFER CONTROL FSM
     typedef enum {
         S_GET_NEXT_ROW, 
-        S_KERNAL_WAIT,
         S_KERNAL_COMPUTE, 
         S_CALC_ROW, 
         S_WAIT_KERNAL,
@@ -365,8 +364,13 @@ module shift_buffer_array #(parameter WIDTH, HEIGHT, TAP_WIDTH, NUM_TAPS, VALUE_
     // outputs
     output logic [VALUE_BITS - 1 : 0] taps_o[NUM_TAPS][NUM_CHANNELS][TAP_WIDTH][HEIGHT]
 );
+    // Note vertically it is a rotating buffer in order to avoid having to shift all the rows each time we write a new row in
+    // Each write is done to buffer_row_head_idx_q and we interpret the sliding window by unrotating with muxing before outputting result
+    logic [VALUE_BITS - 1 : 0] buffer_q[HEIGHT][WIDTH][NUM_CHANNELS];
+    // We write into this index upon the next write 
+    logic [ $clog2(HEIGHT)-1 : 0 ] buffer_row_head_idx_q;
 
-    logic [VALUE_BITS - 1 : 0] buffer[HEIGHT][WIDTH][NUM_CHANNELS];
+    logic [ $clog2(HEIGHT) : 0 ] tmp_row_idx;
 
     // Output taps
     always_comb begin
@@ -374,27 +378,38 @@ module shift_buffer_array #(parameter WIDTH, HEIGHT, TAP_WIDTH, NUM_TAPS, VALUE_
             for (int ch_num = 0; ch_num < NUM_CHANNELS; ch_num++) begin
                 for (int tap_width = 0; tap_width < TAP_WIDTH; tap_width++) begin
                     for (int tap_height = 0; tap_height < HEIGHT; tap_height++) begin
-                        // TODO add in num_tap into width offset instead of just tapping offset relative to start
+                        // Note we have an implicit rotating circuit whoes rotation amount is controlled by buffer_row_heaad_idx_q
+                        // This is beacuse each time we write a row into the head which rotations around the buffer and so 
+                        // Before taking taps we must un-rotate the buffer 
+                        tmp_row_idx = buffer_row_head_idx_q + tap_height;
+                        if (tmp_row_idx >= HEIGHT) tmp_row_idx -= HEIGHT;
+                        // Perform the tap
                         taps_o[ num_tap ][ ch_num ][ tap_width ][ tap_height ] = 
-                            buffer[ tap_height ][ num_tap*WIDTH/NUM_TAPS + tap_width ][ ch_num ];
+                            buffer_q[ tmp_row_idx ][ num_tap*WIDTH/NUM_TAPS + tap_width ][ ch_num ];
                     end
                 end
             end
         end
+        // prevent latch inferance
+        tmp_row_idx = 0;
     end
+
     // State update to the buffer
     always_ff@(posedge clock_i) begin
-        if (shift_vert_i) begin
-            for (int row = 1; row < HEIGHT; row++) begin
-                buffer[row] <= buffer[row-1];
-            end
-            buffer[0] <= next_row_i;
+        if (reset_i) begin
+            buffer_row_head_idx_q <= 0;
+        end else if (shift_vert_i) begin
+            // We write the new row into head, which represents both the low end of the window buffer and the
+            buffer_q[buffer_row_head_idx_q] <= next_row_i;
+            // Increment the head idx unless it overflows in which case reset back to beginning of buffer
+            buffer_row_head_idx_q <= (buffer_row_head_idx_q != HEIGHT-1)?(buffer_row_head_idx_q + 1):0;
+
         end else if (shift_horiz_i) begin
             for (int row = 0; row < HEIGHT; row++) begin
                 for (int col = 0; col < WIDTH-1; col++) begin
-                    buffer[row][col] <= buffer[row][col+1];
+                    buffer_q[row][col] <= buffer_q[row][col+1];
                 end
-                buffer[row][WIDTH-1] <= buffer[row][0];
+                buffer_q[row][WIDTH-1] <= buffer_q[row][0];
             end
         end
     end
