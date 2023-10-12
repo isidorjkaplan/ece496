@@ -202,12 +202,13 @@ module cnn_layer #(
     logic out_row_valid_q;
     logic out_row_last_q;
     logic [ $clog2(OUT_CHANNELS)-1 : 0 ] out_ch_idx_q; 
-
+    logic [TAG_WIDTH-1:0] out_row_tag_q;
 
     // For simple output ports
     assign out_row_o = out_row_q;
     assign out_row_valid_o = out_row_valid_q;
     assign out_row_last_o = out_row_last_q;
+    assign out_row_tag_o = out_row_tag_q;
 
     // buffer signals
     e_state next_state;
@@ -270,17 +271,17 @@ module cnn_layer #(
                 buffer_shift_vert = 1;
                 next_row_idx = row_idx_q + 1;
                 in_row_accept_o = 1;
+                //if this is the last row so after we are starting next image
+                if (in_row_last_i) begin
+                    next_out_row_last = 1;
+                end
                 // Change state to be calculating over that row
-                if (next_row_idx >= KERNAL_SIZE) begin
-                    next_state = S_KERNAL_WAIT;
+                if (row_idx_q >= KERNAL_SIZE-1) begin
+                    next_state = S_KERNAL_COMPUTE;
                     next_out_ch_idx = 0; //for kernal computatins
                     next_col_idx = 0;
                 end
             end
-        end
-        S_KERNAL_WAIT: begin
-            // Wait one cycle for kernal output to update to reflect it's inout
-            next_state = S_KERNAL_COMPUTE;
         end
         S_KERNAL_COMPUTE: begin
             // Latch the output
@@ -292,7 +293,6 @@ module cnn_layer #(
                 end
             end
 
-            next_state = S_KERNAL_WAIT;
             next_out_ch_idx = out_ch_idx_q + 1;
 
             // If this was the last value than go onto calculating the next row
@@ -305,15 +305,13 @@ module cnn_layer #(
             // TODO assuming can produce an output of the kernal each itteration; probably gonna have to stall here
             buffer_shift_horiz = 1;
             next_col_idx = col_idx_q + 1;
-            next_state = S_KERNAL_WAIT; // wait for kernal output to reflect this change
+            next_state = S_KERNAL_COMPUTE; // wait for kernal output to reflect this change
             
             if (next_col_idx*NUM_KERNALS >= WIDTH) begin
                 next_state = S_WAIT_ROW_READ;
                 next_out_row_valid = 1;
-                //if this is the last row so after we are starting next image
-                if (in_row_last_i) begin
-                    next_row_idx = 0; 
-                    next_out_row_last = 1;
+                if (out_row_last_o) begin
+                    next_row_idx = 0;
                 end
             end
         end
@@ -339,7 +337,7 @@ module cnn_layer #(
             out_row_valid_q <= 0;
             out_row_last_q <= 0;
             out_ch_idx_q <= 0;
-            out_row_tag_o <= 0;
+            out_row_tag_q <= 0;
         end else begin
             state_q <= next_state;
             row_idx_q <= next_row_idx;
@@ -348,7 +346,7 @@ module cnn_layer #(
             out_row_valid_q <= next_out_row_valid;
             out_row_last_q <= next_out_row_last;
             out_ch_idx_q <= next_out_ch_idx;
-            out_row_tag_o <= next_out_tag;
+            out_row_tag_q <= next_out_tag;
         end
     end
 
@@ -377,7 +375,8 @@ module shift_buffer_array #(parameter WIDTH, HEIGHT, TAP_WIDTH, NUM_TAPS, VALUE_
                 for (int tap_width = 0; tap_width < TAP_WIDTH; tap_width++) begin
                     for (int tap_height = 0; tap_height < HEIGHT; tap_height++) begin
                         // TODO add in num_tap into width offset instead of just tapping offset relative to start
-                        taps_o[ num_tap ][ ch_num ][ tap_width ][ tap_height ] = buffer[ tap_width ][ tap_height ][ ch_num ];
+                        taps_o[ num_tap ][ ch_num ][ tap_width ][ tap_height ] = 
+                            buffer[ tap_height ][ num_tap*WIDTH/NUM_TAPS + tap_width ][ ch_num ];
                     end
                 end
             end
@@ -417,18 +416,17 @@ module kernal_array #(parameter KERNAL_SIZE, NUM_KERNALS,
     // The output values for each of the stamped kernals, comes on the clock-edge after inputs provided
     output logic [ VALUE_BITS-1 : 0 ] output_values_o  [NUM_KERNALS]
 );
-    logic [ VALUE_BITS-1 : 0 ] comb_values  [NUM_KERNALS];
     // TODO pipeline this and add out_valid signal instead of just combinational logic
     always_comb begin
         for (int kernal_num = 0; kernal_num < NUM_KERNALS; kernal_num++) begin
             // We are assigning output_values_o[kernal][channel] here
-            comb_values[kernal_num] = 0;
+            output_values_o[kernal_num] = 0;
             // Take dot product of kernal_weights[out_channel] with image_values_i[kernal_num]
             for (int in_ch = 0; in_ch < IN_CHANNELS; in_ch++) begin
                 for (int x = 0; x < KERNAL_SIZE; x++) begin
                     for (int y = 0; y < KERNAL_SIZE; y++) begin
                         // Do fixed-point multiplication of the two scalar values
-                        comb_values[kernal_num] += 
+                        output_values_o[kernal_num] += 
                             (kernal_weights_i[in_ch][x][y] 
                             * image_values_i[kernal_num][in_ch][x][y])
                             >> WEIGHT_Q_SHIFT;
@@ -436,9 +434,5 @@ module kernal_array #(parameter KERNAL_SIZE, NUM_KERNALS,
                 end
             end
         end
-    end
-
-    always_ff@(posedge clock_i) begin
-        output_values_o <= comb_values;
     end
 endmodule 

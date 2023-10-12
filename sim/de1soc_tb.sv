@@ -182,9 +182,9 @@ module de1soc_tb();
             
         end
         $display("Writer thread finished");
-        wait_cycles(1000);
+        wait_cycles(1000); // give reader thread time to get any potential values
         $display("Writer thread terminating sim");
-        
+        $stop();
     end
 endmodule 
 
