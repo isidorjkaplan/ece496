@@ -188,8 +188,6 @@ module cnn_layer #(
     typedef enum {
         S_GET_NEXT_ROW, 
         S_KERNAL_COMPUTE, 
-        S_CALC_ROW, 
-        S_WAIT_KERNAL,
         S_WAIT_ROW_READ
     } e_state;
 
@@ -283,7 +281,7 @@ module cnn_layer #(
             end
         end
         S_KERNAL_COMPUTE: begin
-            // Latch the output
+            // Latch the output of the current output_channel / current pixel
             for (int kernal_num = 0; kernal_num < NUM_KERNALS; kernal_num++) begin
                 tmp_idx = (kernal_num*WIDTH/NUM_KERNALS) +  col_idx_q;
                  // Bounds check before writing to output (for fringing effects)
@@ -291,26 +289,24 @@ module cnn_layer #(
                     next_out_row[ tmp_idx ][out_ch_idx_q] = kernal_arr_output[kernal_num];
                 end
             end
-
+            // Move onto computing next output channel
             next_out_ch_idx = out_ch_idx_q + 1;
 
-            // If this was the last value than go onto calculating the next row
+            // If this was the last value in this channel than we must move to the next pixel and reset channel
             if (out_ch_idx_q >= OUT_CHANNELS-1) begin
-                next_state = S_CALC_ROW;
+                // Channel is back to channel 0
                 next_out_ch_idx = 0;
-            end
-        end
-        S_CALC_ROW: begin
-            // TODO assuming can produce an output of the kernal each itteration; probably gonna have to stall here
-            buffer_shift_horiz = 1;
-            next_col_idx = col_idx_q + 1;
-            next_state = S_KERNAL_COMPUTE; // wait for kernal output to reflect this change
-            
-            if (next_col_idx*NUM_KERNALS >= WIDTH) begin
-                next_state = S_WAIT_ROW_READ;
-                next_out_row_valid = 1;
-                if (out_row_last_o) begin
-                    next_row_idx = 0;
+                // Shift so that we get next pixel
+                buffer_shift_horiz = 1;
+                // Increment column to record that we are on next pixel
+                next_col_idx = col_idx_q + 1;                
+                // If this was the last pixel than we must go and read the next row
+                if (next_col_idx*NUM_KERNALS >= WIDTH) begin
+                    next_state = S_WAIT_ROW_READ;
+                    next_out_row_valid = 1;
+                    if (out_row_last_o) begin
+                        next_row_idx = 0;
+                    end
                 end
             end
         end
