@@ -2,17 +2,25 @@
 #include <stdlib.h>
 #include <iostream>
 #include <stdio.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
 
 
+#define MIN(x, y) ((x<=y)?x:y)
+
 int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        std::cout << "Useage: client <filenames...>" << std::endl;
+        return 1;
+    }
     int res;
     addrinfo hints;
     addrinfo* serv_info;
@@ -38,29 +46,89 @@ int main(int argc, char* argv[]) {
     res = connect(sock, serv_info->ai_addr, serv_info->ai_addrlen);
     if (res == -1) {std::cout << "Error, could not connect to server" << std::endl; return 1;}
 
-    // placeholder message
-    char msg[4096];
-    for (int i = 0; i < 4096; ++i) {
-        msg[i] = i % 12;
-    }
-    
-    int offset = 0;
-    while (offset < 4096) {
-        res = send(sock, msg+offset, 4096 - offset, 0);
+    // send each image
+    for (int i = 1; i < argc; ++i) {
+
+        int img_fd = open(argv[i], O_RDONLY);
+        if (img_fd == -1) {
+            std::cout << "File " << argv[1] << " could not be opened" << std::endl;
+            return 1;
+        }
+        struct stat img_stat;
+        fstat(img_fd, &img_stat);
+        int32_t img_size = img_stat.st_size; // in bytes, compressed
+
+        // first, send size of image:
+        std::cout << "Sending image of size " << img_size << std::endl;
+        int32_t img_size_network = htonl(img_size);
+        res = send(sock, (char*)&img_size_network, 4, 0);
         if (res == -1) {std::cout << "Error sending msg" << std::endl; return 1;}
-        offset += res;
+
+        // send image in chunks of 4KiB
+        char msg[4096];
+        
+        while (img_size) {
+            int amt_to_read = MIN(4096, img_size);
+            read(img_fd, msg, amt_to_read); // todo: check error
+            int offset = 0;
+            while (offset < amt_to_read) {
+                res = send(sock, msg+offset, amt_to_read - offset, 0);
+                if (res == -1) {std::cout << "Error sending msg" << std::endl; return 1;}
+                offset += res;
+            }
+            
+            img_size -= amt_to_read;
+        }
+        std::cout << "Sent image succesfully" << std::endl;
+        // recieve image in chunks of 4KiB
+        unsigned int results_size;
+        int offset = 0;
+        while (offset < 4) {
+            res = recv(sock, (char*)&results_size+offset, 4-offset, 0);
+            if (res == -1) {std::cout << "Error recieving msg (size)" << std::endl; return 1;}
+            if (res == 0) {std::cout << "Error connection closed unexpectedly" << std::endl; return 1;} // connection closed
+            offset += res;
+        }
+        results_size = ntohl(results_size);
+        std::cout << "Recieving result of size " << results_size << std::endl;
+        std::string result_file_name = argv[i];
+        result_file_name += ".result";
+        int res_file = open(result_file_name.c_str(), O_WRONLY | O_CREAT, S_IRWXU);
+        if (res_file == -1) {std::cout << "Error opening output file " << errno << std::endl; return 1;}
+
+        while (results_size) {
+            int amt_to_read = MIN(4096, results_size);
+            offset = 0;
+            while (offset < amt_to_read) {
+                res = recv(sock, &msg[offset], amt_to_read - offset, 0);
+                if (res == -1) {std::cout << "Error recieving msg" << std::endl; return 1;}
+                if (res == 0) {std::cout << "Error connection closed unexpectedly" << std::endl; return 1;}
+                offset += res;
+            }
+            offset = 0;
+            while (offset < amt_to_read) {
+                res = write(res_file, msg+offset, amt_to_read-offset);
+                if (res == -1) {std::cout << "Error writing to output file" << std::endl; return 1;}
+                offset += res;
+            }
+            results_size -= amt_to_read;
+        }
+        std::cout << "Wrote results to file" << std::endl;
+        close(res_file);
+        close(img_fd);
     }
 
-    std::cout << "Succesfully sent data" << std::endl;
     
-    offset = 0;
-    while (offset < 4096) {
-        res = recv(sock, msg+offset, 4096 - offset, 0);
-        if (res == -1) {std::cout << "Error recieving msg" << std::endl; return 1;}
-        if (res == 0) {std::cout << "Error connection closed unexpectedly" << std::endl; return 1;}
-        offset += res;
-    }
+    std::cout << "Finished" << std::endl;
+    
+    //int offset = 0;
+    //while (offset < 4096) {
+    //    res = recv(sock, msg+offset, 4096 - offset, 0);
+    //    if (res == -1) {std::cout << "Error recieving msg" << std::endl; return 1;}
+    //    if (res == 0) {std::cout << "Error connection closed unexpectedly" << std::endl; return 1;}
+    //    offset += res;
+    //}
 
-    std::cout << "Succesfully recieved data" << std::endl;
+    //std::cout << "Succesfully recieved data" << std::endl;
     close(sock);
 }
