@@ -3,9 +3,8 @@
 
 module de1soc_tb();
 
-    parameter VALUES_PER_WORD=4;
+    parameter VALUES_PER_WORD=1;
     parameter IMG_WIDTH = 28;
-    parameter OUTPUT_ROW_SIZE = 14; //due to pooling
     parameter IMG_HEIGHT = IMG_WIDTH;
 
     logic clk_reset;
@@ -21,7 +20,13 @@ module de1soc_tb();
 
     logic downstream_stall;
     logic upstream_stall;
-    cnn_top #(.VALUES_PER_WORD(VALUES_PER_WORD)) dut(.clock(clock), .reset(reset), 
+
+    int timed_out;
+    int read_count;
+
+    int last_read_tag = -1;
+
+    de1soc_top dut(.clock(clock), .reset(reset), 
 	// Inputs
 	.in_data(in_data), .in_valid(in_valid),
 	// Outputs
@@ -29,12 +34,9 @@ module de1soc_tb();
 	// Control Flow
 	.downstream_stall(downstream_stall), .upstream_stall(upstream_stall));
 
-    task automatic write_values(input [7:0] values[VALUES_PER_WORD]);
+    task automatic send_word(logic [31:0] word);
     begin
-        in_data = 0;
-        for (int i = 0; i < VALUES_PER_WORD; i++) begin
-            in_data[ 8*i +: 8 ] = values[i];
-        end
+        in_data = word;
         in_valid = 1;
         #1
         while (upstream_stall) begin
@@ -54,28 +56,60 @@ module de1soc_tb();
     end
     endtask
 
-    task automatic write_row(int N);
+    task automatic write_values(input [7:0] values[VALUES_PER_WORD], logic [7:0] cntrl_byte);
+    begin
+        logic [31:0] word;
+        word = 0;
+        for (int i = 0; i < VALUES_PER_WORD; i++) begin
+            word[ 8*i +: 8 ] = values[i];
+        end
+        word[31:24] = cntrl_byte;
+        send_word(word);
+    end
+    endtask
+
+    task automatic write_row(int N, logic [5:0] tag);
     begin
         logic [7:0] values[VALUES_PER_WORD];
+        logic [7:0] cntrl_byte;
+        cntrl_byte = 0;
+        // in_row_last_i is the second last bit of cntrl byte
+        cntrl_byte[6] = N==IMG_WIDTH-1;
+        cntrl_byte[5:0] = tag;
         for (int i = 0; i < IMG_WIDTH; i+=VALUES_PER_WORD) begin
             for (int j = 0; j < VALUES_PER_WORD; j++) begin
                 values[j] = i+j+N*IMG_WIDTH;
             end
-            write_values(values);
+            write_values(values, cntrl_byte);
         end
     end
     endtask
 
-    task automatic read_next_value();
+    task automatic read_next_value(int timeout);
     begin
+        int tag_value;
+        int count = timeout;
+        timed_out = 0;
         // Ready to read
         downstream_stall = 0;
         #1;
         while (!out_valid) begin
+            if (timeout != 0) begin
+                if (count == 0) begin
+                    timed_out = 1;
+                    return;
+                end
+                count = count - 1;
+            end
             @(posedge clock);
             #1;
         end
         //$display("Reading 32'h%x", out_data);
+        tag_value =  out_data[29:24];
+        if (tag_value != last_read_tag) begin
+            last_read_tag = tag_value;
+            $display("Read new tag value = %d", tag_value);
+        end
         @(posedge clock);
         downstream_stall = 1;
         @(posedge clock);
@@ -83,10 +117,21 @@ module de1soc_tb();
     end
     endtask
 
-    task automatic read_values(int N);
+    task automatic read_values(int N, int timeout);
     begin
+        read_count = 0;
         for (int i = 0; i < N; i+=VALUES_PER_WORD) begin
-            read_next_value();
+            read_next_value(timeout);
+            if (timed_out) return;
+            read_count++;
+        end
+    end
+    endtask
+
+    task automatic wait_cycles(int N);
+    begin
+        for (int i = 0; i < N; i++) begin
+            @(posedge clock);
         end
     end
     endtask
@@ -94,9 +139,7 @@ module de1soc_tb();
     assign #5 clock = ~clock & !clk_reset;
     
     initial begin
-        for (int i = 0; i < 5*10000; i++) begin
-            @(posedge clock);
-        end
+        wait_cycles(50000);
         $display("Ran out of time -- murdering simulator\n");
         $stop();
     end
@@ -104,16 +147,17 @@ module de1soc_tb();
     // Reader thread
     initial begin
         // Wait until writer thread reliably running
-        for (int i = 0; i < 20; i++) begin
-            @(posedge clock);
+        wait_cycles(20);
+
+        while (1) begin
+            // blocking read until we get first value value
+            read_values(10000000, 5);
+            if (read_count > 0) begin
+                $display("Read burst result of %d words", read_count);
+            end
         end
 
-        // -1 beacuse of effects of kernal reducing the height
-        for (int i = 0; i < OUTPUT_ROW_SIZE-1; i++) begin
-            read_values(OUTPUT_ROW_SIZE);
-            $display("Read result row %d", i);
-        end
-        $display("Reader thread finished -- Killing simulator\n");
+        //$display("Reader thread finished -- Killing simulator\n");
         //$stop();
     end
 
@@ -127,13 +171,20 @@ module de1soc_tb();
         @(posedge clock);
         reset = 0;
         @(posedge clock);
-
-        for (int i = 0; i < 28; i++) begin
-            write_row(i);
-            $display("Wrote row %d", i);
+        // Send reset signal encoded in the input data (this is how proc signals to flush the CNN pipeline) 
+        send_word({1'b1, 31'b0});
+        for (int img_num = 0; img_num < 3; img_num++) begin
+            for (int i = 0; i < 28; i++) begin
+                write_row(i, img_num);
+                $display("Wrote row %d", i);
+            end
+            wait_cycles(1000);
+            
         end
         $display("Writer thread finished");
-        
+        wait_cycles(1000); // give reader thread time to get any potential values
+        $display("Writer thread terminating sim");
+        $stop();
     end
 endmodule 
 

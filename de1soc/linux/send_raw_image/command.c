@@ -145,6 +145,8 @@ int main (int argc, char *argv[])
 	FIFO_write_ptr =(unsigned int *)(h2p_virtual_base);
 	FIFO_read_ptr = (unsigned int *)(h2p_virtual_base + 0x10); //0x10
 
+	// Send hard reset signal to the FPGA
+	FIFO_WRITE_BLOCK((1 << 31));
 	// give the FPGA time to finish working
 	usleep(30000);  
 	// Flush any initial contents on the Queue
@@ -156,25 +158,45 @@ int main (int argc, char *argv[])
 
 	printf("Flushed FIFO read queue with %d elements\n", read_count);
 
-	int x, y;
+	const int X = 28;
+	const int Y = 28;
+	
+	const int RESULT_WIDTH = 1;
+	const int RESULT_HEIGHT = 1;
+	const int RESULT_CHANNELS = 10;
 
-	for (y = 0; y < 28; y++) {
-		for (x = 0; x < 28; x++) {
-			FIFO_WRITE_BLOCK(x + 28*y);
-		}
-		printf("Wrote row=%d\n", y);
-		if (y >= 2) {
-			for (x = 0; x < 28; x++) {
-				while (!READ_FIFO_EMPTY) {
-					x++;
-					FIFO_READ;
-				}
-				if (x > 28) {
-					printf("WARNING: Read more than 28 row results!!!\n");
-				}
+	int x, y, img_num;
+	for (img_num = 0; img_num < 10; img_num++) {
+		for (y = 0; y < Y; y++) {
+			for (x = 0; x < X; x++) {
+				// Write pixel data
+				FIFO_WRITE_BLOCK( 
+					((x + y/2 + img_num)&0xFF) 			// Pixel Data
+					| (((y==(Y-1))&0xFF)<<30)	// Last Row flag
+					| ((img_num&0xFF) << 24) 	// Image Tag
+				);
 			}
-			printf("Read result row=%d\n", y-2);
-		}	
+		}
+		printf("Wrote image %d\n", img_num);
+		for (y = 0; y < RESULT_HEIGHT; y++) {
+			for (x = 0; x < RESULT_WIDTH; x++) {
+				int ch;
+				printf("Read (x,y)=(%d,%d) from img=%d is [", x, y, img_num);
+
+				for (ch = 0; ch < RESULT_CHANNELS; ch++) {
+					unsigned int data = FIFO_READ;
+					unsigned int last = (data>>30)&1;
+					unsigned int pixel_value = data&0xFF;
+					unsigned int tag = (data>>24)&((1<<5)-1);
+					//printf("Read (x,y)=(%d,%d), ch=%d, last=%d, tag=%d, value=%d\n", x, y, ch, last, tag, pixel_value);
+					printf("%d, ", pixel_value);
+					assert(tag == img_num);
+					assert(last == (y == RESULT_HEIGHT-1));
+				}
+				printf("]\n");
+			}
+		}
+		printf("Read %d resulting values\n", RESULT_HEIGHT*RESULT_WIDTH*RESULT_CHANNELS);
 	}
 
 	printf("Program Done\n");

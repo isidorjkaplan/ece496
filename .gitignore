@@ -36,6 +36,7 @@
 *.nfs.*
 sim/.nfs*
 sim/transcript
+sim/vsim.wlf
 
 # ignore Quartus II generated files
 *_generation_script*
