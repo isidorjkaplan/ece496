@@ -1,3 +1,165 @@
+module conv2d #(
+    parameter WIDTH, 
+    parameter KERNAL_SIZE = 3, 
+    parameter VALUE_BITS = 32,
+    parameter N = 16,
+    parameter M = VALUE_BITS - N - 1,
+    parameter OUTPUT_CHANNELS = 1,
+    parameter INPUT_CHANNELS = 1,
+    parameter RELU = 0
+) (
+    // general
+    input   logic                               clk,                                    // Operating clock
+    input   logic                               reset,                                  // Active-high reset signal (reset when set to 1)
+
+    // Input Interface
+    input   logic signed    [VALUE_BITS-1:0]    i_data[INPUT_CHANNELS],                 // Input pixel value (32-bit signed Q15.16)
+    input   logic                               i_valid,                                // Set to 1 if input pixel is valid
+    output  logic                               i_ready,                                // Set to 1 if consumer block is ready to receive a new pixel
+    input   logic                               i_last,                                 // Set to 1 if input pixel is last of image
+    input   logic signed    [VALUE_BITS-1:0]    i_weights[OUTPUT_CHANNELS][INPUT_CHANNELS][KERNAL_SIZE][KERNAL_SIZE],
+    input   logic signed    [VALUE_BITS-1:0]    i_bias[OUTPUT_CHANNELS],
+
+    // Output Interface
+    output  logic signed    [VALUE_BITS-1:0]    o_data[OUTPUT_CHANNELS],                // Output pixel value (32-bit signed Q15.16)
+    output  logic                               o_valid,                                // Set to 1 if output pixel is valid
+    input   logic                               o_ready,                                // Set to 1 if this block is ready to receive a new pixel
+    output  logic                               o_last                                  // Set to 1 if output pixel is last of image
+);
+    // shared signals
+    logic                               i_readys[INPUT_CHANNELS];
+    logic                               o_valids[INPUT_CHANNELS];
+    logic                               o_lasts[INPUT_CHANNELS];
+    logic signed    [VALUE_BITS-1:0]    o_data_per_in[INPUT_CHANNELS][OUTPUT_CHANNELS];
+    logic signed    [VALUE_BITS-1:0]    i_weights_per_in[INPUT_CHANNELS][OUTPUT_CHANNELS][KERNAL_SIZE][KERNAL_SIZE];
+    logic signed    [VALUE_BITS-1:0]    o_data_pre_relu[OUTPUT_CHANNELS];
+
+    // connect weights
+    always_comb begin
+        for(int out_channel = 0; out_channel < OUTPUT_CHANNELS; out_channel++) begin
+            for(int in_channel = 0; in_channel < INPUT_CHANNELS; in_channel++) begin
+                i_weights_per_in[in_channel][out_channel] = i_weights[out_channel][in_channel];
+            end
+        end
+    end
+
+    // ASSUMING ALL COMPUTATION TAKES THE SAME TIME (which they should, they just use different weights)
+    assign o_valid = o_valids[0];
+    assign o_last = o_lasts[0];
+    assign i_ready = i_readys[0];
+
+    // calculate output, which is sum between channels and bias
+    always_comb begin
+        for(int out_channel = 0; out_channel < OUTPUT_CHANNELS; out_channel++) begin
+            o_data_pre_relu[out_channel] = i_bias[out_channel];
+            for(int in_channel = 0; in_channel < INPUT_CHANNELS; in_channel++) begin
+                o_data_pre_relu[out_channel] += o_data_per_in[in_channel][out_channel];
+            end
+        end
+    end
+
+    // relu generate
+    genvar o_channel;
+    generate
+        if(RELU) begin
+            for (o_channel = 0; o_channel < OUTPUT_CHANNELS; o_channel++) begin : relu_per_channel
+                // if negative then 0, else original value
+                assign o_data[o_channel] = (o_data_pre_relu[o_channel][VALUE_BITS-1]) ? '0 : o_data_pre_relu[o_channel];
+            end
+        end
+        else begin
+            assign o_data = o_data_pre_relu;
+        end
+    endgenerate
+
+    // Declare the conv2d_mult_out -- One for each input channel
+    genvar i_channel;
+    generate
+        for (i_channel = 0; i_channel < INPUT_CHANNELS; i_channel++) begin : conv2d_top
+            conv2d_mult_out #(
+                .WIDTH(WIDTH),
+                .KERNAL_SIZE(KERNAL_SIZE),
+                .VALUE_BITS(VALUE_BITS),
+                .N(N),
+                .OUTPUT_CHANNELS(OUTPUT_CHANNELS)
+            ) channel(
+                .clk(clk),
+                .reset(reset),
+                .i_data(i_data[i_channel]),
+                .i_valid(i_valid),
+                .i_ready(i_readys[i_channel]),
+                .i_last(i_last),
+                .i_weights(i_weights_per_in[i_channel]),
+                .o_data(o_data_per_in[i_channel]),
+                .o_valid(o_valids[i_channel]),
+                .o_ready(o_ready),
+                .o_last(o_lasts[i_channel])
+            );
+        end
+    endgenerate
+
+endmodule
+
+module conv2d_mult_out #(
+    parameter WIDTH, 
+    parameter KERNAL_SIZE = 3, 
+    parameter VALUE_BITS = 32,
+    parameter N = 16,
+    parameter M = VALUE_BITS - N - 1,
+    parameter OUTPUT_CHANNELS
+) (
+    // general
+    input   logic                               clk,                                    // Operating clock
+    input   logic                               reset,                                  // Active-high reset signal (reset when set to 1)
+
+    // Input Interface
+    input   logic signed    [VALUE_BITS-1:0]    i_data,                                 // Input pixel value (32-bit signed Q15.16)
+    input   logic                               i_valid,                                // Set to 1 if input pixel is valid
+    output  logic                               i_ready,                                // Set to 1 if consumer block is ready to receive a new pixel
+    input   logic                               i_last,                                 // Set to 1 if input pixel is last of image
+    input   logic signed    [VALUE_BITS-1:0]    i_weights [OUTPUT_CHANNELS][KERNAL_SIZE][KERNAL_SIZE],
+
+    // Output Interface
+    output  logic signed    [VALUE_BITS-1:0]    o_data[OUTPUT_CHANNELS],                // Output pixel value (32-bit signed Q15.16)
+    output  logic                               o_valid,                                // Set to 1 if output pixel is valid
+    input   logic                               o_ready,                                // Set to 1 if this block is ready to receive a new pixel
+    output  logic                               o_last                                  // Set to 1 if output pixel is last of image
+);
+    // shared signals
+    logic   o_valids[OUTPUT_CHANNELS];
+    logic   o_lasts[OUTPUT_CHANNELS];
+
+    // ASSUMING ALL COMPUTATION TAKES THE SAME TIME (which they should, they just use different weights)
+    assign o_valid = o_valids[0];
+    assign o_last = o_lasts[0];
+
+    // Declare the conv2d_single_out -- One for each output channel
+    genvar o_channel;
+    generate
+        for (o_channel = 0; o_channel < OUTPUT_CHANNELS; o_channel++) begin : conv2d_mult_out
+            conv2d_single_out #(
+                .WIDTH(WIDTH),
+                .KERNAL_SIZE(KERNAL_SIZE),
+                .VALUE_BITS(VALUE_BITS),
+                .N(N) 
+            ) channel(
+                .clk(clk),
+                .reset(reset),
+                .i_data(i_data),
+                .i_valid(i_valid),
+                .i_ready(i_ready),
+                .i_last(i_last),
+                .i_weights(i_weights[o_channel]),
+                .o_data(o_data[o_channel]),
+                .o_valid(o_valids[o_channel]),
+                .o_ready(o_ready),
+                .o_last(o_lasts[o_channel])
+            );
+        end
+    endgenerate
+
+endmodule
+
 module conv2d_single_out #(
     parameter WIDTH, 
     parameter KERNAL_SIZE = 3, 
