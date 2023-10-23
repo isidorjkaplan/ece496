@@ -952,7 +952,7 @@ set_instance_assignment -name PACKAGE_SKEW_COMPENSATION OFF -to HPS_DDR3_CK_N
 #============================================================
 
 
-set_global_assignment -name LAST_QUARTUS_VERSION "20.1.0 Standard Edition"
+set_global_assignment -name LAST_QUARTUS_VERSION "22.1std.2 Lite Edition"
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
@@ -971,8 +971,8 @@ set_global_assignment -name TIMING_ANALYZER_MULTICORNER_ANALYSIS ON
 set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
 set_global_assignment -name FITTER_EFFORT "AUTO FIT"
 set_global_assignment -name SMART_RECOMPILE OFF
-set_global_assignment -name SYSTEMVERILOG_FILE ../../verilog/img_model.sv
-set_global_assignment -name SYSTEMVERILOG_FILE ../../verilog/cnn.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../verilog/model.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../verilog/conv2d.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../verilog/de1soc_top.sv
 set_global_assignment -name SDC_FILE DE1_SoC_Computer.out.sdc
 set_global_assignment -name QIP_FILE Computer_System/synthesis/Computer_System.qip

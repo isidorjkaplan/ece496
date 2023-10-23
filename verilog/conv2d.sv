@@ -126,10 +126,12 @@ module conv2d_mult_out #(
     output  logic                               o_last                                  // Set to 1 if output pixel is last of image
 );
     // shared signals
+    logic   i_readys[OUTPUT_CHANNELS];
     logic   o_valids[OUTPUT_CHANNELS];
     logic   o_lasts[OUTPUT_CHANNELS];
 
     // ASSUMING ALL COMPUTATION TAKES THE SAME TIME (which they should, they just use different weights)
+    assign i_ready = i_readys[0];
     assign o_valid = o_valids[0];
     assign o_last = o_lasts[0];
 
@@ -147,7 +149,7 @@ module conv2d_mult_out #(
                 .reset(reset),
                 .i_data(i_data),
                 .i_valid(i_valid),
-                .i_ready(i_ready),
+                .i_ready(i_readys[o_channel]),
                 .i_last(i_last),
                 .i_weights(i_weights[o_channel]),
                 .o_data(o_data[o_channel]),
