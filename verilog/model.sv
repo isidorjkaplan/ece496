@@ -1,6 +1,6 @@
 // Input is streamed where we recieve an image as 28*28 individual transfers with the grayscale values
 module model #(
-    parameter VALUE_BITS = 24,
+    parameter VALUE_BITS = 32,
     parameter N = 16,
     // DO NOT CHANGE BELOW VALUES
     INPUT_WIDTH = 28, INPUT_CHANNELS=1, OUTPUT_WIDTH = 1, OUTPUT_CHANNELS = 10
