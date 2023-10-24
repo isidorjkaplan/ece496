@@ -166,7 +166,7 @@ void sendToFPGA(int* buf, int numWords) {
     const int NUM_ROWS_FOR_VALID_OUTPUT = 28;
     const int RESULT_WIDTH = 7;
     const int RESULT_CHANNELS = 10;
-
+    usleep(1000);
     int x, y;
     int out_row_count = 0;
     for (y=0; y < Y; y++) {
@@ -175,6 +175,56 @@ void sendToFPGA(int* buf, int numWords) {
         }
     }
     usleep(1000);
+}
+
+int decodeJPEG(const std::vector<char>& img_data, std::vector<char>& pixbuf) {
+    struct jpeg_decompress_struct cinfo;
+    struct jpeg_error_mgr jerr;
+    
+    // make decompression errors not crash the server because that is bad
+    cinfo.err = jpeg_std_error(&jerr);  
+    // does some initialization stuff for cinfo
+    jpeg_create_decompress(&cinfo);
+    // tell libjpeg to grab the jpeg from our vector buffer
+    jpeg_mem_src(&cinfo, (unsigned char*)&img_data[0], img_data.size());
+
+    // bad function name. Doesn't really parse header for data, but will return -1 if jpeg header invalid
+    int res = jpeg_read_header(&cinfo, TRUE);
+    if (res == -1) {std::cout << "Error reading jpeg, something wrong with the jpeg file" << std::endl; return 1;}
+
+    // actually read the header now
+    jpeg_start_decompress(&cinfo);
+
+    int img_width, img_height, num_components;
+    img_width = cinfo.output_width; img_height = cinfo.output_height;
+    num_components = cinfo.output_components;
+    
+    size_t pixbuf_size = img_width * img_height * num_components;
+    size_t row_size = img_width * num_components;
+
+    pixbuf.resize(pixbuf_size);
+
+    // read all the lines of the JPEG. Might be a better way than this, idk
+    while (cinfo.output_scanline < cinfo.output_height) {
+        unsigned char *scanbuf[1];
+        scanbuf[0] = (unsigned char*)&pixbuf[row_size * cinfo.output_scanline];
+        jpeg_read_scanlines(&cinfo, scanbuf, 1);
+    }
+    
+    // reset cinfo, can now be used for new image
+    jpeg_finish_decompress(&cinfo);
+
+    // destroy cinfo
+    jpeg_destroy_decompress(&cinfo);
+
+    for (int i = 0; i < 28; ++i) {
+        for (int j = 0; j < 28; ++j) {
+            std::cout << (int)pixbuf[i*row_size + j*num_components] << ' ';
+        }
+        std::cout << std::endl;
+    }
+
+    return 0;
 }
 
 int main(int argc, char* argv[]) {
@@ -209,12 +259,13 @@ int main(int argc, char* argv[]) {
     sockaddr_storage client_addr;
     socklen_t client_addr_size = sizeof(client_addr);
     int client_sock;
+    std::vector<char> pixbuf; // move outside loop to avoid excessive allocations.
+    std::vector<char> img_data; // ^^
     while (true) {
         client_sock = accept(sock, (sockaddr*)&client_addr, &client_addr_size);
         if (client_sock == -1) {std::cout << "Error accepting connection" << std::endl; return 1;}
         // okay, we have accepted 1 connection. Lets recieve some data
      
-        std::vector<char> img_data;
         while (true) {
             int32_t img_size;
             int offset = 0;
@@ -241,67 +292,22 @@ int main(int argc, char* argv[]) {
             }
 
             {
-                struct jpeg_decompress_struct cinfo;
-                struct jpeg_error_mgr jerr;
-                
-                // make decompression errors not crash the server because that is bad
-                cinfo.err = jpeg_std_error(&jerr);  
-                // does some initialization stuff for cinfo
-                jpeg_create_decompress(&cinfo);
-                // tell libjpeg to grab the jpeg from our vector buffer
-                jpeg_mem_src(&cinfo, (unsigned char*)&img_data[0], img_data.size());
-
-                // bad function name. Doesn't really parse header for data, but will return -1 if jpeg header invalid
-                res = jpeg_read_header(&cinfo, TRUE);
-                if (res == -1) {std::cout << "Error reading jpeg, something wrong with the jpeg file" << std::endl; return 1;}
-
-                // actually read the header now
-                jpeg_start_decompress(&cinfo);
-
-                int img_width, img_height, num_components;
-                img_width = cinfo.output_width; img_height = cinfo.output_height;
-                num_components = cinfo.output_components;
-                
-                size_t pixbuf_size = img_width * img_height * num_components;
-                size_t row_size = img_width * num_components;
-
-                unsigned char *pixbuf = (unsigned char*)malloc(pixbuf_size);
-
-                // read all the lines of the JPEG. Might be a better way than this, idk
-                while (cinfo.output_scanline < cinfo.output_height) {
-                    unsigned char *scanbuf[1];
-                    scanbuf[0] = pixbuf + row_size * cinfo.output_scanline;
-                    jpeg_read_scanlines(&cinfo, scanbuf, 1);
-                }
-                
-                // reset cinfo, can now be used for new image
-                jpeg_finish_decompress(&cinfo);
-
-                // destroy cinfo
-                jpeg_destroy_decompress(&cinfo);
-
-                for (int i = 0; i < 28; ++i) {
-                    for (int j = 0; j < 28; ++j) {
-                        std::cout << (int)pixbuf[i*row_size + j*num_components] << ' ';
-                    }
-                    std::cout << std::endl;
-                }
-
+                res = decodeJPEG(img_data, pixbuf);
+                if (res != 0) {return 1;}
                 offset = 0;
-                unsigned int net_size = htonl(pixbuf_size);
-                std::cout << "Sending result of size " << pixbuf_size << std::endl; 
+                unsigned int net_size = htonl(pixbuf.size());
+                std::cout << "Sending result of size " << pixbuf.size() << std::endl; 
                 while (offset < 4) {
                     res = send(client_sock, (char*)&net_size+offset, 4-offset, 0);
                     if (res == -1) {std::cout << "Error sending msg" << std::endl; return 1;}
                     offset +=res;
                 }
                 offset = 0;
-                while (offset < pixbuf_size) {
-                    res = send(client_sock, pixbuf+offset, pixbuf_size - offset, 0);
+                while (offset < pixbuf.size()) {
+                    res = send(client_sock, &pixbuf[offset], pixbuf.size() - offset, 0);
                     if (res == -1) {std::cout << "Error sending msg" << std::endl; return 1;}
                     offset += res;
                 }
-                free(pixbuf);
             }
         }
 
