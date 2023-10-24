@@ -151,7 +151,8 @@ void initFPGABus() {
 	printf("Flushed FIFO read queue with %d elements\n", read_count);
 }
 
-void recvFromFPGA(int* buf, int numWords) {
+
+void recvFromFPGA(int* buf) {
     int* bstart = buf;
     while (!READ_FIFO_EMPTY) {
         *(buf++) = FIFO_READ;
@@ -159,25 +160,32 @@ void recvFromFPGA(int* buf, int numWords) {
     printf("%d words read\n", buf-bstart);
 }
 
-void sendToFPGA(int* buf, int numWords) {
+void sendToFPGA(char* buf) {
     const int X = 28;
     const int Y = 28;
     // This is a feature of the neural network architecture chosen
     const int NUM_ROWS_FOR_VALID_OUTPUT = 28;
     const int RESULT_WIDTH = 7;
     const int RESULT_CHANNELS = 10;
-    usleep(1000);
+    
     int x, y;
     int out_row_count = 0;
     for (y=0; y < Y; y++) {
         for (x=0; x < X; x++) {
-            FIFO_WRITE_BLOCK(x + 28*y);
+            FIFO_WRITE_BLOCK((int)(unsigned char)buf[x + 28*y]);
         }
     }
-    usleep(1000);
+    
 }
 
-int decodeJPEG(const std::vector<char>& img_data, std::vector<char>& pixbuf) {
+struct ImgInfo {
+    int height;
+    int width;
+    int chans;
+    // assume three channels always
+};
+
+int decodeJPEG(const std::vector<char>& img_data, std::vector<char>& pixbuf, ImgInfo& img_info) {
     struct jpeg_decompress_struct cinfo;
     struct jpeg_error_mgr jerr;
     
@@ -216,14 +224,52 @@ int decodeJPEG(const std::vector<char>& img_data, std::vector<char>& pixbuf) {
 
     // destroy cinfo
     jpeg_destroy_decompress(&cinfo);
-
+/*
     for (int i = 0; i < 28; ++i) {
         for (int j = 0; j < 28; ++j) {
             std::cout << (int)pixbuf[i*row_size + j*num_components] << ' ';
         }
         std::cout << std::endl;
     }
+*/
+    img_info = {img_height, img_width, num_components};
 
+    return 0;
+}
+
+// pass in the out_info of the desired image
+void scaleNN(const std::vector<char>& ipixbuf, const ImgInfo img_info, std::vector<char>& outbuf, const ImgInfo out_info) {
+    outbuf.resize(out_info.width * out_info.height * 1);
+    
+    // TODO: maybe support more than one output channel
+    
+    // sample from middle
+    int r_offset = img_info.height / out_info.height / 2;
+    int c_offset = img_info.width / out_info.width / 2;
+    //std::cout << "FROM: " << img_info.height << ' ' << img_info.width << " TO: " << out_info.height << ' ' << out_info.width <<std::endl;
+    for (int r = 0; r < out_info.height; ++r) {
+        for (int c = 0; c < out_info.width; ++c) {
+            int R, C;
+            R = r * img_info.height / out_info.height + r_offset;
+            C = c * img_info.width / out_info.width + c_offset;
+
+            //std::cout << (int)ipixbuf[img_info.chans*(R * img_info.width + C)] << ' ';
+            // todo: luminance
+            outbuf[r * out_info.width + c] = ipixbuf[img_info.chans*(R * img_info.width + C)];
+        }
+        //std::cout << std::endl;
+    }
+}
+
+int jpeg_to_neural(const std::vector<char>& img_data, std::vector<char>& nbuf) {
+    std::vector<char> temp_buf;
+    ImgInfo temp_info;
+    int res = decodeJPEG(img_data, temp_buf, temp_info);
+    if (res != 0) return 1;
+    std::cout << "Decode succesful, about to scale" << std::endl;
+    ImgInfo neural_info = {28, 28, 1};
+    scaleNN(temp_buf, temp_info, nbuf, neural_info);
+    std::cout << "Scale succesful" << std::endl;
     return 0;
 }
 
@@ -256,6 +302,8 @@ int main(int argc, char* argv[]) {
 
     // okay, we are listening for TCP connections. Now lets respond to incoming connections
     
+    initFPGABus();
+
     sockaddr_storage client_addr;
     socklen_t client_addr_size = sizeof(client_addr);
     int client_sock;
@@ -292,8 +340,16 @@ int main(int argc, char* argv[]) {
             }
 
             {
-                res = decodeJPEG(img_data, pixbuf);
+                // begin image processing
+                res = jpeg_to_neural(img_data, pixbuf);
                 if (res != 0) {return 1;}
+                // end image processing
+                // begin FPGA I/O
+                sendToFPGA(&pixbuf[0]);
+                pixbuf.resize(28*28);
+                std::cout << "Sent to FPGA" << std::endl;
+                recvFromFPGA((int*)&pixbuf[0]);
+                // end FPGA I/O
                 offset = 0;
                 unsigned int net_size = htonl(pixbuf.size());
                 std::cout << "Sending result of size " << pixbuf.size() << std::endl; 
