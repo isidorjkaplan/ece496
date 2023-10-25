@@ -148,11 +148,11 @@ module conv2d_single_in_mult_out #(
 
     // generate output data
     logic [$clog2(OUTPUT_CHANNELS):0]   counter;
-    // logic signed [VALUE_BITS-1:0]       weights[KERNAL_SIZE][KERNAL_SIZE];
     logic signed [VALUE_BITS-1:0]       o_data_q[OUTPUT_CHANNELS];
     logic                               o_valid_q;
-    // logic signed [VALUE_BITS*2-1:0]     mult_val[KERNAL_SIZE*KERNAL_SIZE];
-    logic signed [VALUE_BITS*2-1:0]     next_o_data;
+    logic signed [VALUE_BITS*2-1:0]     next_dsp_out;
+    logic signed [VALUE_BITS-1:0]       dsp_out_q;
+    logic                               out_from_dsp;
 
     assign o_valid = o_valid_q;
     assign o_last = taps_last_q;
@@ -210,18 +210,22 @@ module conv2d_single_in_mult_out #(
         if(reset) begin
             counter <= '0;
             o_valid_q <= 0;
+            out_from_dsp <= 0;
         end
         // if true it means that we computed the last o_data signal last cycle so we are done
         // written this way for now due to easier logic, wastes one cycle here
         // also set 
         else if(counter == OUTPUT_CHANNELS) begin
             counter <= '0;
+            out_from_dsp <= 0;
             o_valid_q <= 1;
         end
         // if taps is valid and we haven't generated output yet then increment counter every cycle
         // increment to work with different channel's weight and log them in correct position when computed
+        // we will stay in each counter for two cycles due to timing limitation
         else if(taps_valid_q && !o_valid_q) begin
-            counter <= counter + 1;
+            if(out_from_dsp) counter <= counter + 1;
+            out_from_dsp <= ~out_from_dsp;
         end
         // if data is computed and output is ready to consume, then next posedge it will be consumed
         // then lower o_valid_q
@@ -231,12 +235,14 @@ module conv2d_single_in_mult_out #(
     end
 
     // log values onto o_data_q as long as counter in range and not o_valid_q
-    // fine since o_valid_q is low and garbage in o_data_q shouldn't matter
+    // fine without reset since when o_valid_q is low, garbage in o_data_q shouldn't matter
     // once o_valid high stop changing its output until o_valid is low again
     // which means its consumed
     always_ff@(posedge clk) begin
-        if(counter < OUTPUT_CHANNELS && !o_valid_q)
-            o_data_q[counter] <= next_o_data[N+:VALUE_BITS];
+        if(counter < OUTPUT_CHANNELS && !o_valid_q) begin
+            dsp_out_q <= next_dsp_out[N+:VALUE_BITS];
+            o_data_q[counter] <= dsp_out_q;
+        end
     end
 
     // KERNAL LOGIC -- SIMPLE NON-PIPELINED VERSION
@@ -257,7 +263,7 @@ module conv2d_single_in_mult_out #(
     
     // always_comb begin
     //     // default value
-    //     next_o_data = 0;
+    //     next_dsp_out = 0;
     //     for(int row = 0; row < KERNAL_SIZE; row++) begin
     //         for(int col = 0; col < KERNAL_SIZE; col++) begin
     //             weights[row][col] = '0;
@@ -270,17 +276,17 @@ module conv2d_single_in_mult_out #(
     //     end
     //     if (counter < OUTPUT_CHANNELS) begin
     //         for (int i = 0; i < (KERNAL_SIZE*KERNAL_SIZE); i++) begin
-    //             next_o_data += mult_val[i];
+    //             next_dsp_out += mult_val[i];
     //         end
     //     end
     // end
 
     always_comb begin
-        next_o_data = 0;
+        next_dsp_out = 0;
         if (counter < OUTPUT_CHANNELS) begin
             for (int row = 0; row < KERNAL_SIZE; row++) begin
                 for (int col = 0; col < KERNAL_SIZE; col++) begin
-                    next_o_data += i_weights[counter][row][col] * taps_q[row][col];
+                    next_dsp_out += i_weights[counter][row][col] * taps_q[row][col];
                 end
             end
         end
