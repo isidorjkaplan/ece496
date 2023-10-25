@@ -1,4 +1,3 @@
-// could prob do the log output val in this module
 module conv2d #(
     parameter WIDTH = 28, 
     parameter KERNAL_SIZE = 3, 
@@ -29,12 +28,19 @@ module conv2d #(
 );
     // shared signals
     logic                               i_readys[INPUT_CHANNELS];
-    logic                               o_valids[INPUT_CHANNELS];
-    logic                               o_lasts[INPUT_CHANNELS];
-    logic signed    [VALUE_BITS-1:0]    o_data_per_in[INPUT_CHANNELS][OUTPUT_CHANNELS];
+    logic                               next_o_valids[INPUT_CHANNELS];
+    logic                               next_o_valid;
+    logic                               o_valid_q;
+    logic                               next_o_lasts[INPUT_CHANNELS];
+    logic                               next_o_last;
+    logic                               o_last_q;
     logic signed    [VALUE_BITS-1:0]    i_weights_per_in[INPUT_CHANNELS][OUTPUT_CHANNELS][KERNAL_SIZE][KERNAL_SIZE];
-    logic signed    [VALUE_BITS-1:0]    o_data_pre_relu[OUTPUT_CHANNELS];
     logic signed    [VALUE_BITS-1:0]    i_bias_per_out[OUTPUT_CHANNELS];
+    logic signed    [VALUE_BITS-1:0]    o_data_per_in[INPUT_CHANNELS][OUTPUT_CHANNELS];
+    logic signed    [VALUE_BITS-1:0]    next_o_data_pre_relu[OUTPUT_CHANNELS];
+    logic signed    [VALUE_BITS-1:0]    next_o_data[OUTPUT_CHANNELS];
+    logic signed    [VALUE_BITS-1:0]    o_data_q[OUTPUT_CHANNELS];
+    
 
     // connect weights and conform them from Q15.16 to the QM.N format we are using
     always_comb begin
@@ -51,16 +57,21 @@ module conv2d #(
     end
 
     // ASSUMING ALL COMPUTATION TAKES THE SAME TIME (which they should, they just use different weights)
-    assign o_valid = o_valids[0];
-    assign o_last = o_lasts[0];
+    assign next_o_valid = next_o_valids[0];
+    assign next_o_last = next_o_lasts[0];
     assign i_ready = i_readys[0];
+
+    // output with ff stuff
+    assign o_data = o_data_q;
+    assign o_valid = o_valid_q;
+    assign o_last = o_last_q;
 
     // calculate output, which is sum between channels and bias
     always_comb begin
         for(int out_channel = 0; out_channel < OUTPUT_CHANNELS; out_channel++) begin
-            o_data_pre_relu[out_channel] = i_bias[out_channel];
+            next_o_data_pre_relu[out_channel] = i_bias_per_out[out_channel];
             for(int in_channel = 0; in_channel < INPUT_CHANNELS; in_channel++) begin
-                o_data_pre_relu[out_channel] += o_data_per_in[in_channel][out_channel];
+                next_o_data_pre_relu[out_channel] += o_data_per_in[in_channel][out_channel];
             end
         end
     end
@@ -71,13 +82,29 @@ module conv2d #(
         if(RELU) begin
             for (o_channel = 0; o_channel < OUTPUT_CHANNELS; o_channel++) begin : relu_per_channel
                 // if negative then 0, else original value
-                assign o_data[o_channel] = (o_data_pre_relu[o_channel][VALUE_BITS-1]) ? '0 : o_data_pre_relu[o_channel];
+                assign next_o_data[o_channel] = (next_o_data_pre_relu[o_channel][VALUE_BITS-1]) ? '0 : next_o_data_pre_relu[o_channel];
             end
         end
         else begin
-            assign o_data = o_data_pre_relu;
+            assign next_o_data = next_o_data_pre_relu;
         end
     endgenerate
+
+    // output ff
+    always_ff@(posedge clk) begin
+        if(reset) begin
+            o_valid_q <= 0;
+            o_last_q <= 0;
+            for(int o_ch = 0; o_ch < OUTPUT_CHANNELS; o_ch++)begin
+                o_data_q[o_ch] <= '0;
+            end
+        end
+        else if(o_ready) begin
+            o_valid_q <= next_o_valid;
+            o_last_q <= next_o_last;
+            o_data_q <= next_o_data;
+        end
+    end
 
     // Declare the conv2d_mult_out -- One for each input channel
     genvar i_channel;
@@ -98,9 +125,9 @@ module conv2d #(
                 .i_last(i_last),
                 .i_weights(i_weights_per_in[i_channel]),
                 .o_data(o_data_per_in[i_channel]),
-                .o_valid(o_valids[i_channel]),
+                .o_valid(next_o_valids[i_channel]),
                 .o_ready(o_ready),
-                .o_last(o_lasts[i_channel])
+                .o_last(next_o_lasts[i_channel])
             );
         end
     endgenerate
@@ -219,7 +246,6 @@ module conv2d_single_in_mult_out #(
         end
         // if true it means that we computed the last o_data signal last cycle so we are done
         // written this way for now due to easier logic, wastes one cycle here
-        // also set 
         else if(counter == OUTPUT_CHANNELS) begin
             counter <= '0;
             dsp_counter <= 0;
@@ -227,7 +253,7 @@ module conv2d_single_in_mult_out #(
         end
         // if taps is valid and we haven't generated output yet then increment counter every cycle
         // increment to work with different channel's weight and log them in correct position when computed
-        // we will stay in each counter for three cycles due to timing limitation
+        // we will stay in each counter for two cycles due to timing limitation
         else if(taps_valid_q && !o_valid_q) begin
             if(dsp_counter) begin
                 counter <= counter + 1;
@@ -242,66 +268,25 @@ module conv2d_single_in_mult_out #(
         end
     end
 
+    // KERNAL LOGIC -- computation split in two parts
     // log values onto o_data_q as long as counter in range and not o_valid_q
     // fine without reset since when o_valid_q is low, garbage in o_data_q shouldn't matter
     // once o_valid high stop changing its output until o_valid is low again
     // which means its consumed
     // 
-    // takes 3 cycle to compute and have it loaded in o_data_q
-    // 1st cycle: correct outchannel weights loaded into weights
-    // 2nd cycle: data get computed and loaded into dsp_out_q
-    // 3rd cycle: data loaded into correct index at o_data_q
-    // hopefully this packs weights and dsp_out_q into dsp so now counter
-    // doesn't need to be routed near dsp and solve timing
+    // takes 2 cycle to compute and have it loaded in o_data_q
+    // 1st cycle: weighted average of 9 pixels calculated
+    // 2nd cycle: sum of the 9 weighted average loaded to o_data_q
     always_ff@(posedge clk) begin
         if(counter < OUTPUT_CHANNELS && !o_valid_q) begin
-            o_data_q[counter] <= next_o_data;            
-        end
-    end
-
-    // KERNAL LOGIC -- SIMPLE NON-PIPELINED VERSION
-    // genvar r;
-    // genvar c;
-    // generate
-    //     for (r = 0; r < KERNAL_SIZE; r++) begin : mult_r
-    //         for (c = 0; c < KERNAL_SIZE; c++) begin : mult_c
-    //             assign mult_val[r*KERNAL_SIZE + c] = weights[r][c] * taps_q[r][c];
-    //             // mult multiplier(
-    //             //     .dataa(taps_q[r][c]),
-    //             //     .datab(weights[r][c]),
-    //             //     .result(mult_val[r*KERNAL_SIZE + c])
-    //             // );
-    //         end
-    //     end
-    // endgenerate
-    
-    // always_comb begin
-    //     // default value
-    //     next_dsp_out = 0;
-    //     for(int row = 0; row < KERNAL_SIZE; row++) begin
-    //         for(int col = 0; col < KERNAL_SIZE; col++) begin
-    //             weights[row][col] = '0;
-    //         end
-    //     end
-
-    //     // assign correct value if counter in range
-    //     if (counter < OUTPUT_CHANNELS) begin
-    //         weights = i_weights[counter];
-    //     end
-    //     if (counter < OUTPUT_CHANNELS) begin
-    //         for (int i = 0; i < (KERNAL_SIZE*KERNAL_SIZE); i++) begin
-    //             next_dsp_out += mult_val[i];
-    //         end
-    //     end
-    // end
-
-    always_ff@(posedge clk) begin
-        if (counter < OUTPUT_CHANNELS) begin
+            // sum into o_data_q
+            o_data_q[counter] <= next_o_data;   
+            // multiply into intermediate register for timing
             for (int row = 0; row < KERNAL_SIZE; row++) begin
                 for (int col = 0; col < KERNAL_SIZE; col++) begin
                     mult_out[row*KERNAL_SIZE + col] <= i_weights[counter][row][col] * taps_q[row][col];
                 end
-            end
+            end         
         end
     end
 
