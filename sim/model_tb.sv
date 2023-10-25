@@ -1,6 +1,7 @@
 module tb();
     // Define some local parameters useful for simulation
-    localparam VALUE_BITS = 32;
+    localparam VALUE_BITS = 18;
+    localparam N = 12;
     localparam CLK_PERIOD = 20;                    // Clock period is 20ns
     localparam QSTEP = CLK_PERIOD/4;                // Time step of a quarter of a clock period
     localparam TIMESTEP = CLK_PERIOD/10;        // Time step of one tenth of a clock period
@@ -23,10 +24,10 @@ module tb();
     logic o_valid;
     logic o_ready;
     logic o_last;
-    logic signed [VALUE_BITS-1:0]  i_weights[OUTPUT_CHANNELS][INPUT_CHANNELS][FILTER_SIZE][FILTER_SIZE];
+    logic signed [31:0]  i_weights[OUTPUT_CHANNELS][INPUT_CHANNELS][FILTER_SIZE][FILTER_SIZE];
     logic signed [VALUE_BITS-1:0]  i_data[INPUT_CHANNELS];
     logic signed [VALUE_BITS-1:0]  o_data[OUTPUT_CHANNELS];
-    logic signed [VALUE_BITS-1:0]  i_bias[OUTPUT_CHANNELS];
+    logic signed [31:0]  i_bias[OUTPUT_CHANNELS];
 
     // Generate a 50MHz clock
     initial clk = 1'b1;
@@ -118,7 +119,7 @@ module tb();
         .WIDTH(28), 
         .KERNAL_SIZE(FILTER_SIZE), 
         .VALUE_BITS(VALUE_BITS),
-        .N(16),
+        .N(N),
         .OUTPUT_CHANNELS(OUTPUT_CHANNELS),
         .INPUT_CHANNELS(INPUT_CHANNELS)
     ) dut (
@@ -184,7 +185,7 @@ module tb();
             // Prepare an input value (if it is first or last pixel of the row, insert zero for padding in case of a 3x3 filte. Otherwise, insert pixel)
             temp = $fscanf(test_image, "%d ", pixel_val); 
 
-            i_data[0] = pixel_val << 16;
+            i_data[0] = pixel_val << N;
             saved_i_x = i_data[0];
             if(pixel_id == (image_width*image_height)-1) begin
                 i_last = 1;
@@ -269,7 +270,7 @@ module tb();
             // Prepare an input value (if it is first or last pixel of the row, insert zero for padding in case of a 3x3 filte. Otherwise, insert pixel)
             temp = $fscanf(test_image, "%d ", pixel_val); 
 
-            i_data[0] = pixel_val << 16;
+            i_data[0] = pixel_val << N;
             saved_i_x = i_data[0];
             if(pixel_id == (image_width*image_height)-1) begin
                 i_last = 1;
@@ -356,7 +357,7 @@ module tb();
                             $fwrite(result_image[out_channel], "\n");
                         end            
                         // Write the output pixel and difference between output and golden result
-                        $fwrite(result_image[out_channel], "%d ", o_data[out_channel][16+:16]);
+                        $fwrite(result_image[out_channel], "%d ", o_data[out_channel][N+:(VALUE_BITS-N)]);
                     end
                     // Increment our loop counter
                     out_id = out_id + 1;

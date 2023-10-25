@@ -1,6 +1,6 @@
 // could prob do the log output val in this module
 module conv2d #(
-    parameter WIDTH, 
+    parameter WIDTH = 28, 
     parameter KERNAL_SIZE = 3, 
     parameter VALUE_BITS = 32,
     parameter N = 16,
@@ -18,8 +18,8 @@ module conv2d #(
     input   logic                               i_valid,                                // Set to 1 if input pixel is valid
     output  logic                               i_ready,                                // Set to 1 if consumer block is ready to receive a new pixel
     input   logic                               i_last,                                 // Set to 1 if input pixel is last of image
-    input   logic signed    [VALUE_BITS-1:0]    i_weights[OUTPUT_CHANNELS][INPUT_CHANNELS][KERNAL_SIZE][KERNAL_SIZE],
-    input   logic signed    [VALUE_BITS-1:0]    i_bias[OUTPUT_CHANNELS],
+    input   logic signed    [31:0]              i_weights[OUTPUT_CHANNELS][INPUT_CHANNELS][KERNAL_SIZE][KERNAL_SIZE],
+    input   logic signed    [31:0]              i_bias[OUTPUT_CHANNELS],
 
     // Output Interface
     output  logic signed    [VALUE_BITS-1:0]    o_data[OUTPUT_CHANNELS],                // Output pixel value (32-bit signed Q15.16)
@@ -34,13 +34,19 @@ module conv2d #(
     logic signed    [VALUE_BITS-1:0]    o_data_per_in[INPUT_CHANNELS][OUTPUT_CHANNELS];
     logic signed    [VALUE_BITS-1:0]    i_weights_per_in[INPUT_CHANNELS][OUTPUT_CHANNELS][KERNAL_SIZE][KERNAL_SIZE];
     logic signed    [VALUE_BITS-1:0]    o_data_pre_relu[OUTPUT_CHANNELS];
+    logic signed    [VALUE_BITS-1:0]    i_bias_per_out[OUTPUT_CHANNELS];
 
-    // connect weights
+    // connect weights and conform them from Q15.16 to the QM.N format we are using
     always_comb begin
         for(int out_channel = 0; out_channel < OUTPUT_CHANNELS; out_channel++) begin
             for(int in_channel = 0; in_channel < INPUT_CHANNELS; in_channel++) begin
-                i_weights_per_in[in_channel][out_channel] = i_weights[out_channel][in_channel];
+                for(int row = 0; row < KERNAL_SIZE; row++) begin
+                    for(int col = 0; col < KERNAL_SIZE; col++) begin
+                        i_weights_per_in[in_channel][out_channel][row][col] = i_weights[out_channel][in_channel][row][col][(16-N)+:VALUE_BITS];
+                    end
+                end                
             end
+            i_bias_per_out[out_channel] = i_bias[out_channel][(16-N)+:VALUE_BITS];
         end
     end
 
@@ -141,10 +147,12 @@ module conv2d_single_in_mult_out #(
     logic                               taps_last_q;
 
     // generate output data
-    logic [$clog2(OUTPUT_CHANNELS):0] counter;
+    logic [$clog2(OUTPUT_CHANNELS):0]   counter;
+    // logic signed [VALUE_BITS-1:0]       weights[KERNAL_SIZE][KERNAL_SIZE];
     logic signed [VALUE_BITS-1:0]       o_data_q[OUTPUT_CHANNELS];
     logic                               o_valid_q;
-    logic signed [2*VALUE_BITS-1:0]     next_o_data;
+    // logic signed [VALUE_BITS*2-1:0]     mult_val[KERNAL_SIZE*KERNAL_SIZE];
+    logic signed [VALUE_BITS*2-1:0]     next_o_data;
 
     assign o_valid = o_valid_q;
     assign o_last = taps_last_q;
@@ -232,6 +240,41 @@ module conv2d_single_in_mult_out #(
     end
 
     // KERNAL LOGIC -- SIMPLE NON-PIPELINED VERSION
+    // genvar r;
+    // genvar c;
+    // generate
+    //     for (r = 0; r < KERNAL_SIZE; r++) begin : mult_r
+    //         for (c = 0; c < KERNAL_SIZE; c++) begin : mult_c
+    //             assign mult_val[r*KERNAL_SIZE + c] = weights[r][c] * taps_q[r][c];
+    //             // mult multiplier(
+    //             //     .dataa(taps_q[r][c]),
+    //             //     .datab(weights[r][c]),
+    //             //     .result(mult_val[r*KERNAL_SIZE + c])
+    //             // );
+    //         end
+    //     end
+    // endgenerate
+    
+    // always_comb begin
+    //     // default value
+    //     next_o_data = 0;
+    //     for(int row = 0; row < KERNAL_SIZE; row++) begin
+    //         for(int col = 0; col < KERNAL_SIZE; col++) begin
+    //             weights[row][col] = '0;
+    //         end
+    //     end
+
+    //     // assign correct value if counter in range
+    //     if (counter < OUTPUT_CHANNELS) begin
+    //         weights = i_weights[counter];
+    //     end
+    //     if (counter < OUTPUT_CHANNELS) begin
+    //         for (int i = 0; i < (KERNAL_SIZE*KERNAL_SIZE); i++) begin
+    //             next_o_data += mult_val[i];
+    //         end
+    //     end
+    // end
+
     always_comb begin
         next_o_data = 0;
         if (counter < OUTPUT_CHANNELS) begin
