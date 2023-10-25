@@ -152,7 +152,12 @@ module conv2d_single_in_mult_out #(
     logic                               o_valid_q;
     logic signed [VALUE_BITS*2-1:0]     next_dsp_out;
     logic signed [VALUE_BITS-1:0]       dsp_out_q;
-    logic                               out_from_dsp;
+    logic signed [VALUE_BITS-1:0]       weights[KERNAL_SIZE][KERNAL_SIZE];
+    // use dsp counter so counter value increment every three cycle
+    // first cycle correct weights loaded into register from i_weight
+    // second cycle correct data into dsp_out_q
+    // third cycle o_data_q loaded from dsp_out_q and counter increment
+    logic [1:0]                         dsp_counter;
 
     assign o_valid = o_valid_q;
     assign o_last = taps_last_q;
@@ -210,22 +215,25 @@ module conv2d_single_in_mult_out #(
         if(reset) begin
             counter <= '0;
             o_valid_q <= 0;
-            out_from_dsp <= 0;
+            dsp_counter <= '0;
         end
         // if true it means that we computed the last o_data signal last cycle so we are done
         // written this way for now due to easier logic, wastes one cycle here
         // also set 
         else if(counter == OUTPUT_CHANNELS) begin
             counter <= '0;
-            out_from_dsp <= 0;
+            dsp_counter <= '0;
             o_valid_q <= 1;
         end
         // if taps is valid and we haven't generated output yet then increment counter every cycle
         // increment to work with different channel's weight and log them in correct position when computed
-        // we will stay in each counter for two cycles due to timing limitation
+        // we will stay in each counter for three cycles due to timing limitation
         else if(taps_valid_q && !o_valid_q) begin
-            if(out_from_dsp) counter <= counter + 1;
-            out_from_dsp <= ~out_from_dsp;
+            if(dsp_counter == 2'b10) begin
+                counter <= counter + 1;
+                dsp_counter <= '0;
+            end
+            dsp_counter <= dsp_counter+1;
         end
         // if data is computed and output is ready to consume, then next posedge it will be consumed
         // then lower o_valid_q
@@ -238,10 +246,18 @@ module conv2d_single_in_mult_out #(
     // fine without reset since when o_valid_q is low, garbage in o_data_q shouldn't matter
     // once o_valid high stop changing its output until o_valid is low again
     // which means its consumed
+    // 
+    // takes 3 cycle to compute and have it loaded in o_data_q
+    // 1st cycle: correct outchannel weights loaded into weights
+    // 2nd cycle: data get computed and loaded into dsp_out_q
+    // 3rd cycle: data loaded into correct index at o_data_q
+    // hopefully this packs weights and dsp_out_q into dsp so now counter
+    // doesn't need to be routed near dsp and solve timing
     always_ff@(posedge clk) begin
         if(counter < OUTPUT_CHANNELS && !o_valid_q) begin
+            weights <= i_weights[counter];
             dsp_out_q <= next_dsp_out[N+:VALUE_BITS];
-            o_data_q[counter] <= dsp_out_q;
+            o_data_q[counter] <= dsp_out_q;            
         end
     end
 
@@ -286,7 +302,7 @@ module conv2d_single_in_mult_out #(
         if (counter < OUTPUT_CHANNELS) begin
             for (int row = 0; row < KERNAL_SIZE; row++) begin
                 for (int col = 0; col < KERNAL_SIZE; col++) begin
-                    next_dsp_out += i_weights[counter][row][col] * taps_q[row][col];
+                    next_dsp_out += weights[row][col] * taps_q[row][col];
                 end
             end
         end
