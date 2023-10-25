@@ -367,12 +367,12 @@ output					HPS_USB_STP;
 
 //wire			[15: 0]	hex5_hex4;
 
-assign HEX0 = 7'b0;
-assign HEX1 = 7'b0;
-assign HEX2 = 7'b0;
-assign HEX3 = 7'b0;
-assign HEX4 = 7'b0;
-assign HEX5 = 7'b0;
+assign HEX0 = 7'b1111111; // apparently 1 means off -- don't want to burn out HEX displays
+assign HEX1 = 7'b1111111;
+assign HEX2 = 7'b1111111;
+assign HEX3 = 7'b1111111;
+assign HEX4 = 7'b1111111;
+assign HEX5 = 7'b1111111;
 
 
 //=======================================================

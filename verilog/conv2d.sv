@@ -1,5 +1,5 @@
 module conv2d #(
-    parameter WIDTH, 
+    parameter WIDTH = 28, 
     parameter KERNAL_SIZE = 3, 
     parameter VALUE_BITS = 32,
     parameter N = 16,
@@ -17,8 +17,8 @@ module conv2d #(
     input   logic                               i_valid,                                // Set to 1 if input pixel is valid
     output  logic                               i_ready,                                // Set to 1 if consumer block is ready to receive a new pixel
     input   logic                               i_last,                                 // Set to 1 if input pixel is last of image
-    input   logic signed    [VALUE_BITS-1:0]    i_weights[OUTPUT_CHANNELS][INPUT_CHANNELS][KERNAL_SIZE][KERNAL_SIZE],
-    input   logic signed    [VALUE_BITS-1:0]    i_bias[OUTPUT_CHANNELS],
+    input   logic signed    [31:0]              i_weights[OUTPUT_CHANNELS][INPUT_CHANNELS][KERNAL_SIZE][KERNAL_SIZE],
+    input   logic signed    [31:0]              i_bias[OUTPUT_CHANNELS],
 
     // Output Interface
     output  logic signed    [VALUE_BITS-1:0]    o_data[OUTPUT_CHANNELS],                // Output pixel value (32-bit signed Q15.16)
@@ -28,32 +28,50 @@ module conv2d #(
 );
     // shared signals
     logic                               i_readys[INPUT_CHANNELS];
-    logic                               o_valids[INPUT_CHANNELS];
-    logic                               o_lasts[INPUT_CHANNELS];
-    logic signed    [VALUE_BITS-1:0]    o_data_per_in[INPUT_CHANNELS][OUTPUT_CHANNELS];
+    logic                               next_o_valids[INPUT_CHANNELS];
+    logic                               next_o_valid;
+    logic                               o_valid_q;
+    logic                               next_o_lasts[INPUT_CHANNELS];
+    logic                               next_o_last;
+    logic                               o_last_q;
     logic signed    [VALUE_BITS-1:0]    i_weights_per_in[INPUT_CHANNELS][OUTPUT_CHANNELS][KERNAL_SIZE][KERNAL_SIZE];
-    logic signed    [VALUE_BITS-1:0]    o_data_pre_relu[OUTPUT_CHANNELS];
+    logic signed    [VALUE_BITS-1:0]    i_bias_per_out[OUTPUT_CHANNELS];
+    logic signed    [VALUE_BITS-1:0]    o_data_per_in[INPUT_CHANNELS][OUTPUT_CHANNELS];
+    logic signed    [VALUE_BITS-1:0]    next_o_data_pre_relu[OUTPUT_CHANNELS];
+    logic signed    [VALUE_BITS-1:0]    next_o_data[OUTPUT_CHANNELS];
+    logic signed    [VALUE_BITS-1:0]    o_data_q[OUTPUT_CHANNELS];
+    
 
-    // connect weights
+    // connect weights and conform them from Q15.16 to the QM.N format we are using
     always_comb begin
         for(int out_channel = 0; out_channel < OUTPUT_CHANNELS; out_channel++) begin
             for(int in_channel = 0; in_channel < INPUT_CHANNELS; in_channel++) begin
-                i_weights_per_in[in_channel][out_channel] = i_weights[out_channel][in_channel];
+                for(int row = 0; row < KERNAL_SIZE; row++) begin
+                    for(int col = 0; col < KERNAL_SIZE; col++) begin
+                        i_weights_per_in[in_channel][out_channel][row][col] = i_weights[out_channel][in_channel][row][col][(16-N)+:VALUE_BITS];
+                    end
+                end                
             end
+            i_bias_per_out[out_channel] = i_bias[out_channel][(16-N)+:VALUE_BITS];
         end
     end
 
     // ASSUMING ALL COMPUTATION TAKES THE SAME TIME (which they should, they just use different weights)
-    assign o_valid = o_valids[0];
-    assign o_last = o_lasts[0];
+    assign next_o_valid = next_o_valids[0];
+    assign next_o_last = next_o_lasts[0];
     assign i_ready = i_readys[0];
+
+    // output with ff stuff
+    assign o_data = o_data_q;
+    assign o_valid = o_valid_q;
+    assign o_last = o_last_q;
 
     // calculate output, which is sum between channels and bias
     always_comb begin
         for(int out_channel = 0; out_channel < OUTPUT_CHANNELS; out_channel++) begin
-            o_data_pre_relu[out_channel] = i_bias[out_channel];
+            next_o_data_pre_relu[out_channel] = i_bias_per_out[out_channel];
             for(int in_channel = 0; in_channel < INPUT_CHANNELS; in_channel++) begin
-                o_data_pre_relu[out_channel] += o_data_per_in[in_channel][out_channel];
+                next_o_data_pre_relu[out_channel] += o_data_per_in[in_channel][out_channel];
             end
         end
     end
@@ -64,19 +82,35 @@ module conv2d #(
         if(RELU) begin
             for (o_channel = 0; o_channel < OUTPUT_CHANNELS; o_channel++) begin : relu_per_channel
                 // if negative then 0, else original value
-                assign o_data[o_channel] = (o_data_pre_relu[o_channel][VALUE_BITS-1]) ? '0 : o_data_pre_relu[o_channel];
+                assign next_o_data[o_channel] = (next_o_data_pre_relu[o_channel][VALUE_BITS-1]) ? '0 : next_o_data_pre_relu[o_channel];
             end
         end
         else begin
-            assign o_data = o_data_pre_relu;
+            assign next_o_data = next_o_data_pre_relu;
         end
     endgenerate
+
+    // output ff
+    always_ff@(posedge clk) begin
+        if(reset) begin
+            o_valid_q <= 0;
+            o_last_q <= 0;
+            for(int o_ch = 0; o_ch < OUTPUT_CHANNELS; o_ch++)begin
+                o_data_q[o_ch] <= '0;
+            end
+        end
+        else if(o_ready) begin
+            o_valid_q <= next_o_valid;
+            o_last_q <= next_o_last;
+            o_data_q <= next_o_data;
+        end
+    end
 
     // Declare the conv2d_mult_out -- One for each input channel
     genvar i_channel;
     generate
         for (i_channel = 0; i_channel < INPUT_CHANNELS; i_channel++) begin : conv2d_top
-            conv2d_mult_out #(
+            conv2d_single_in_mult_out #(
                 .WIDTH(WIDTH),
                 .KERNAL_SIZE(KERNAL_SIZE),
                 .VALUE_BITS(VALUE_BITS),
@@ -91,22 +125,25 @@ module conv2d #(
                 .i_last(i_last),
                 .i_weights(i_weights_per_in[i_channel]),
                 .o_data(o_data_per_in[i_channel]),
-                .o_valid(o_valids[i_channel]),
+                .o_valid(next_o_valids[i_channel]),
                 .o_ready(o_ready),
-                .o_last(o_lasts[i_channel])
+                .o_last(next_o_lasts[i_channel])
             );
         end
     endgenerate
 
 endmodule
 
-module conv2d_mult_out #(
+// time multiplex with output channels
+// computes one output channel per cycle
+// output valid once everything is generated
+module conv2d_single_in_mult_out #(
     parameter WIDTH, 
     parameter KERNAL_SIZE = 3, 
     parameter VALUE_BITS = 32,
     parameter N = 16,
     parameter M = VALUE_BITS - N - 1,
-    parameter OUTPUT_CHANNELS
+    parameter OUTPUT_CHANNELS = 1
 ) (
     // general
     input   logic                               clk,                                    // Operating clock
@@ -125,69 +162,33 @@ module conv2d_mult_out #(
     input   logic                               o_ready,                                // Set to 1 if this block is ready to receive a new pixel
     output  logic                               o_last                                  // Set to 1 if output pixel is last of image
 );
-    // shared signals
-    logic   i_readys[OUTPUT_CHANNELS];
-    logic   o_valids[OUTPUT_CHANNELS];
-    logic   o_lasts[OUTPUT_CHANNELS];
+    
+    logic signed [VALUE_BITS - 1 : 0]   buffer_taps[KERNAL_SIZE][KERNAL_SIZE];
+    logic                               buffer_ready;
+    logic                               buffer_valid;
+    logic                               buffer_last;
 
-    // ASSUMING ALL COMPUTATION TAKES THE SAME TIME (which they should, they just use different weights)
-    assign i_ready = i_readys[0];
-    assign o_valid = o_valids[0];
-    assign o_last = o_lasts[0];
+    // registered value for processing
+    logic signed [VALUE_BITS - 1 : 0]   taps_q[KERNAL_SIZE][KERNAL_SIZE];
+    logic                               taps_valid_q;
+    logic                               taps_last_q;
 
-    // Declare the conv2d_single_out -- One for each output channel
-    genvar o_channel;
-    generate
-        for (o_channel = 0; o_channel < OUTPUT_CHANNELS; o_channel++) begin : conv2d_mult_out
-            conv2d_single_out #(
-                .WIDTH(WIDTH),
-                .KERNAL_SIZE(KERNAL_SIZE),
-                .VALUE_BITS(VALUE_BITS),
-                .N(N) 
-            ) channel(
-                .clk(clk),
-                .reset(reset),
-                .i_data(i_data),
-                .i_valid(i_valid),
-                .i_ready(i_readys[o_channel]),
-                .i_last(i_last),
-                .i_weights(i_weights[o_channel]),
-                .o_data(o_data[o_channel]),
-                .o_valid(o_valids[o_channel]),
-                .o_ready(o_ready),
-                .o_last(o_lasts[o_channel])
-            );
-        end
-    endgenerate
+    // generate output data
+    logic [$clog2(OUTPUT_CHANNELS):0]   counter;
+    logic signed [VALUE_BITS-1:0]       o_data_q[OUTPUT_CHANNELS];
+    logic                               o_valid_q;
+    logic signed [VALUE_BITS*2-1:0]     mult_out[KERNAL_SIZE*KERNAL_SIZE];
+    logic signed [VALUE_BITS-1:0]       next_o_data;
+    logic signed [VALUE_BITS-1:0]       weights[KERNAL_SIZE][KERNAL_SIZE];
+    // use dsp counter so counter value increment every three cycle
+    // first cycle correct weights loaded into register from i_weight
+    // second cycle correct data into dsp_out_q
+    // third cycle o_data_q loaded from dsp_out_q and counter increment
+    logic                               dsp_counter;
 
-endmodule
-
-module conv2d_single_out #(
-    parameter WIDTH, 
-    parameter KERNAL_SIZE = 3, 
-    parameter VALUE_BITS = 32,
-    parameter N = 16,
-    parameter M = VALUE_BITS - N - 1
-) (
-    // general
-    input   logic                               clk,                                    // Operating clock
-    input   logic                               reset,                                  // Active-high reset signal (reset when set to 1)
-
-    // Input Interface
-    input   logic signed    [VALUE_BITS-1:0]    i_data,                                 // Input pixel value (32-bit signed Q15.16)
-    input   logic                               i_valid,                                // Set to 1 if input pixel is valid
-    output  logic                               i_ready,                                // Set to 1 if consumer block is ready to receive a new pixel
-    input   logic                               i_last,                                 // Set to 1 if input pixel is last of image
-    input   logic signed    [VALUE_BITS-1:0]    i_weights [KERNAL_SIZE][KERNAL_SIZE],
-
-    // Output Interface
-    output  logic signed    [VALUE_BITS-1:0]    o_data,                                 // Output pixel value (32-bit signed Q15.16)
-    output  logic                               o_valid,                                // Set to 1 if output pixel is valid
-    input   logic                               o_ready,                                // Set to 1 if this block is ready to receive a new pixel
-    output  logic                               o_last                                  // Set to 1 if output pixel is last of image
-
-);
-    logic signed [VALUE_BITS - 1 : 0] taps[KERNAL_SIZE][KERNAL_SIZE];
+    assign o_valid = o_valid_q;
+    assign o_last = taps_last_q;
+    assign o_data = o_data_q;
 
     shift_buffer_array_conv #(
         .WIDTH(WIDTH), 
@@ -204,39 +205,106 @@ module conv2d_single_out #(
         .i_last(i_last),
         
         // output interface
-        .o_taps(taps), 
-        .o_valid(o_valid), 
-        .o_ready(o_ready),
-        .o_last(o_last)
+        .o_taps(buffer_taps), 
+        .o_valid(buffer_valid), 
+        .o_ready(buffer_ready),
+        .o_last(buffer_last)
     );
 
-    // KERNAL LOGIC -- SIMPLE NON-PIPELINED VERSION
-    logic signed    [2*VALUE_BITS-1:0]  tmp;
-    always_comb begin
-        tmp = 0;
-        if (o_valid) begin
-            for (int row = 0; row < KERNAL_SIZE; row++) begin
-                for (int col = 0; col < KERNAL_SIZE; col++) begin
-                    tmp += i_weights[row][col] * taps[row][col];
-                end
-            end
-            // maybe add logic to check for overflow here?
-            // if (tmp > 255) o_y_comb = 255;
-            // else if (tmp < 0) o_y_comb = 0;
-            // else o_y_comb = tmp;
+    // logging taps value
+    always_ff@(posedge clk) begin
+        // Reset values
+        // taps last and taps valid to 0 since we dont have a valid tap value
+        // buffer_ready because we are ready to log the taps value
+        if (reset) begin
+            taps_valid_q <= 0;
+            taps_last_q <= 0;
+            buffer_ready <= 1;
+        end 
+        // log taps value if we are ready and valid taps value is presented
+        // also set buffer_ready low and start compute o_data
+        else if (buffer_ready && buffer_valid) begin
+            taps_q <= buffer_taps;
+            taps_valid_q <= 1;
+            buffer_ready <= 0;
+            taps_last_q <= buffer_last;
+        end
+        // if consumed then reset signal and tell buffer we can get next tap
+        else if (o_valid_q && o_ready) begin
+            taps_valid_q <= 0;
+            taps_last_q <= 0;
+            buffer_ready <= 1;
         end
     end
-    
-    assign o_data = tmp[N+:VALUE_BITS];
 
-endmodule 
+    // control signal for computing and gating output
+    always_ff@(posedge clk) begin
+        if(reset) begin
+            counter <= '0;
+            o_valid_q <= 0;
+            dsp_counter <= 0;
+        end
+        // if true it means that we computed the last o_data signal last cycle so we are done
+        // written this way for now due to easier logic, wastes one cycle here
+        else if(counter == OUTPUT_CHANNELS) begin
+            counter <= '0;
+            dsp_counter <= 0;
+            o_valid_q <= 1;
+        end
+        // if taps is valid and we haven't generated output yet then increment counter every cycle
+        // increment to work with different channel's weight and log them in correct position when computed
+        // we will stay in each counter for two cycles due to timing limitation
+        else if(taps_valid_q && !o_valid_q) begin
+            if(dsp_counter) begin
+                counter <= counter + 1;
+                dsp_counter <= ~dsp_counter;
+            end
+            dsp_counter <= ~dsp_counter;
+        end
+        // if data is computed and output is ready to consume, then next posedge it will be consumed
+        // then lower o_valid_q
+        else if(o_valid_q && o_ready) begin
+            o_valid_q <= 0;
+        end
+    end
+
+    // KERNAL LOGIC -- computation split in two parts
+    // log values onto o_data_q as long as counter in range and not o_valid_q
+    // fine without reset since when o_valid_q is low, garbage in o_data_q shouldn't matter
+    // once o_valid high stop changing its output until o_valid is low again
+    // which means its consumed
+    // 
+    // takes 2 cycle to compute and have it loaded in o_data_q
+    // 1st cycle: weighted average of 9 pixels calculated
+    // 2nd cycle: sum of the 9 weighted average loaded to o_data_q
+    always_ff@(posedge clk) begin
+        if(counter < OUTPUT_CHANNELS && !o_valid_q) begin
+            // sum into o_data_q
+            o_data_q[counter] <= next_o_data;   
+            // multiply into intermediate register for timing
+            for (int row = 0; row < KERNAL_SIZE; row++) begin
+                for (int col = 0; col < KERNAL_SIZE; col++) begin
+                    mult_out[row*KERNAL_SIZE + col] <= i_weights[counter][row][col] * taps_q[row][col];
+                end
+            end         
+        end
+    end
+
+    always_comb begin
+        next_o_data = '0;
+        for(int idx = 0; idx < (KERNAL_SIZE*KERNAL_SIZE); idx++) begin
+            next_o_data += mult_out[idx][N+:VALUE_BITS];
+        end
+    end
+
+endmodule
 
 // Core data organizational structure for my CNN implementation
 // FMax: Module can run at 420-430 MHz
 // INPUTS: Stream in pixels one at a time in row-major order serially
 // OUTPUTS: A paralell rectangular output slice, called a tap, which marches across the image in row-major order (to be fed to kernal)
 // IMPLEMENTATION: Implemented as TAP_HEIGHT independant rams with SIMD reading and individual-control writing
-//        One row (which rotates around) is used as writing scratchpad, while all rows are simoultaniously read
+//        One row (which rotates around) is used as writing scratchpad, while all rows are simultaniously read
 //        When reading we perform arbitrary rotiation on data so that the output view apears as a FIFO sliding 
 //        window vertically even though the implementation is actually a rotating buffer
 module shift_buffer_array_conv #(
@@ -322,7 +390,7 @@ module shift_buffer_array_conv #(
         next_taps = taps_q;
         write_en = 0;
         o_valid = 0;
-        next_taps_last = 0;
+        next_taps_last = taps_last_q;
         i_ready = (!input_done_row_q && o_ready && !taps_last_q); // ready to receive input when input is not done with its row, and downstream is accepting data, and we are not waiting for last tap to be consumed
 
         // Input and output march in lockstep so both must be ready to march
