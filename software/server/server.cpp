@@ -151,7 +151,7 @@ void initFPGABus() {
 	printf("Flushed FIFO read queue with %d elements\n", read_count);
 }
 
-
+// Recieve data from FPGA, place into buffer
 void recvFromFPGA(int* buf) {
     int* bstart = buf;
     while (!READ_FIFO_EMPTY) {
@@ -160,6 +160,8 @@ void recvFromFPGA(int* buf) {
     printf("%d words read\n", buf-bstart);
 }
 
+// Send data contained within buf to FPGA
+// Hard-coded buffer size
 void sendToFPGA(char* buf) {
     const int X = 28;
     const int Y = 28;
@@ -178,13 +180,15 @@ void sendToFPGA(char* buf) {
     
 }
 
+// Represents dimensions of image
 struct ImgInfo {
     int height;
     int width;
     int chans;
-    // assume three channels always
 };
 
+// converts JPEG image in img_data, places result in pixbuf.
+// result image dims placed into img_info
 int decodeJPEG(const std::vector<char>& img_data, std::vector<char>& pixbuf, ImgInfo& img_info) {
     struct jpeg_decompress_struct cinfo;
     struct jpeg_error_mgr jerr;
@@ -237,7 +241,8 @@ int decodeJPEG(const std::vector<char>& img_data, std::vector<char>& pixbuf, Img
     return 0;
 }
 
-// pass in the out_info of the desired image
+// Scale *raw pixel* image in ipixbuf with dims described by img_info
+// place result into outbuf. out_info describes size of desired output image, but only one channel is supported for now
 void scaleNN(const std::vector<char>& ipixbuf, const ImgInfo img_info, std::vector<char>& outbuf, const ImgInfo out_info) {
     outbuf.resize(out_info.width * out_info.height * 1);
     
@@ -261,6 +266,7 @@ void scaleNN(const std::vector<char>& ipixbuf, const ImgInfo img_info, std::vect
     }
 }
 
+// End-to-end conversion from JPEG in img_data, to a 28x28x1 image output to nbuf
 int jpeg_to_neural(const std::vector<char>& img_data, std::vector<char>& nbuf) {
     std::vector<char> temp_buf;
     ImgInfo temp_info;
@@ -273,6 +279,7 @@ int jpeg_to_neural(const std::vector<char>& img_data, std::vector<char>& nbuf) {
     return 0;
 }
 
+// The software server
 int main(int argc, char* argv[]) {
     int res;
     addrinfo hints;
