@@ -28,6 +28,8 @@ module conv2d #(
     input   logic                               o_ready,                                // Set to 1 if this block is ready to receive a new pixel
     output  logic                               o_last                                  // Set to 1 if output pixel is last of image
 );
+    localparam OUT_WIDTH = WIDTH - KERNAL_SIZE + 1;
+
     // shared signals
     logic                               i_readys[INPUT_CHANNELS];
     logic                               next_o_valids[INPUT_CHANNELS];
@@ -70,27 +72,30 @@ module conv2d #(
     // stride masking of output
     logic [$clog2(STRIDE-1):0] stride_row_mod_counter;
     logic [$clog2(STRIDE-1):0] stride_col_mod_counter;
-    logic [$clog2(WIDTH-1):0] stride_col_counter;
+    logic [$clog2(OUT_WIDTH-1):0] stride_col_counter;
 
     always_ff@(posedge clk) begin
-        if (reset) begin
+        if (reset || (o_valid && o_last && o_ready)) begin
             stride_row_mod_counter <= 0;
             stride_col_mod_counter <= 0;
             stride_col_counter <= 0;
         end else if (o_valid_q && o_ready) begin // if the result would actually be latched otherwise don't do anything
             // Always increment column mod STRIDE, resetting whenever we count STRIDE pixels
-            stride_col_mod_counter <= (stride_col_mod_counter==STRIDE-1)?0:(stride_col_mod_counter+1);
+            stride_col_mod_counter <= (stride_col_mod_counter==(STRIDE-1))?0:(stride_col_mod_counter+1);
             // Always increment column, resetting when we get a full row
-            stride_col_counter <= (stride_col_counter == WIDTH-1)?0:stride_col_counter;
+            stride_col_counter <= stride_col_counter + 1;
             // If we are about to reset the column we increment the row
-            if (stride_col_counter == WIDTH-1) begin
+            if (stride_col_counter == (OUT_WIDTH-1)) begin
                 // Increment row mod counter, resetting when we hit STRIDE rows
-                stride_row_mod_counter <= (stride_row_mod_counter == STRIDE-1)?0:(stride_row_mod_counter+1);
+                stride_row_mod_counter <= (stride_row_mod_counter == (STRIDE-1)) ? 0 : (stride_row_mod_counter+1);
+                // The column resets when the row increments
+                stride_col_counter <= 0;
+                stride_col_mod_counter <= 0;
             end
         end
     end
     // Mask for stride purposes
-    assign o_valid = o_valid_q && (stride_row_mod_counter == 0 && stride_col_mod_counter == 0);
+    assign o_valid = o_valid_q && (o_last || (stride_row_mod_counter == (STRIDE-1) && stride_col_mod_counter == (STRIDE-1)));
   
 
     // calculate output, which is sum between channels and bias
@@ -125,8 +130,7 @@ module conv2d #(
             for(int o_ch = 0; o_ch < OUTPUT_CHANNELS; o_ch++)begin
                 o_data_q[o_ch] <= '0;
             end
-        end
-        else if(o_ready) begin
+        end else if(o_ready) begin
             o_valid_q <= next_o_valid;
             o_last_q <= next_o_last;
             o_data_q <= next_o_data;

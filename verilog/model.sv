@@ -170,11 +170,11 @@ module model #(
     );
 
     conv2d #(
-        .WIDTH(9),
+        .WIDTH(5),
         .KERNAL_SIZE(3),
         .VALUE_BITS(VALUE_BITS),
         .N(N),
-        .STRIDE(2),
+        .STRIDE(1),
         .OUTPUT_CHANNELS(OUTPUT_CHANNELS),
         .INPUT_CHANNELS(CNN3_IN_CH)
     ) conv3 (

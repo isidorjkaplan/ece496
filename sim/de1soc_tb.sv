@@ -108,10 +108,6 @@ module de1soc_tb();
         end
         //$display("Reading 32'h%x", out_data);
         tag_value =  out_data[29:24];
-        if (tag_value != last_read_tag) begin
-            last_read_tag = tag_value;
-            $display("Read new tag value = %d", tag_value);
-        end
         @(posedge clock);
         downstream_stall = 1;
         @(posedge clock);
@@ -179,6 +175,7 @@ module de1soc_tb();
             for (int i = 0; i < 28; i++) begin
                 write_row(i, img_num);
                 $display("Wrote row %d", i);
+                wait_cycles(100);
             end
             wait_cycles(1000);
             
