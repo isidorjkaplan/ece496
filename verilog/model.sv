@@ -9,13 +9,15 @@ module model #(
     input clk, 
     input reset,
     // next row logic
-    input   logic [VALUE_BITS - 1 : 0]  in_data[INPUT_CHANNELS],
-    input   logic                       in_valid,
-    output  logic                       in_ready,
+    input   logic signed [VALUE_BITS - 1 : 0]  in_data[INPUT_CHANNELS],
+    input   logic                              in_last,
+    input   logic                              in_valid,
+    output  logic                              in_ready,
     // output row valid 
-    output  logic [VALUE_BITS - 1 : 0]  out_data[OUTPUT_CHANNELS],
-    output  logic                       out_valid,
-    input   logic                       out_ready
+    output  logic signed [VALUE_BITS - 1 : 0]  out_data[OUTPUT_CHANNELS],
+    output  logic                              out_valid,
+    output  logic                              out_last,
+    input   logic                              out_ready
 );    
     // weights
     localparam                                      CNN1_IN_CH = 1;
@@ -89,15 +91,15 @@ module model #(
     end
 
     // conv1 <-> conv2
-    logic [VALUE_BITS-1:0]  conv1toconv2_data[CNN1_OUT_CH];
-    logic                   conv1toconv2_o_valid;
-    logic                   conv2toconv1_o_ready;
-    logic                   conv1toconv2_o_last;
+    logic signed [VALUE_BITS-1:0]  conv1toconv2_data[CNN1_OUT_CH];
+    logic                          conv1toconv2_o_valid;
+    logic                          conv2toconv1_o_ready;
+    logic                          conv1toconv2_o_last;
     // conv2 <-> conv3
-    logic [VALUE_BITS-1:0]  conv2toconv3_data[CNN2_OUT_CH];
-    logic                   conv2toconv3_o_valid;
-    logic                   conv3toconv2_o_ready;
-    logic                   conv2toconv3_o_last;
+    logic signed [VALUE_BITS-1:0]  conv2toconv3_data[CNN2_OUT_CH];
+    logic                          conv2toconv3_o_valid;
+    logic                          conv3toconv2_o_ready;
+    logic                          conv2toconv3_o_last;
 
     // conv2d #(
     //     .WIDTH(INPUT_WIDTH),
@@ -134,7 +136,7 @@ module model #(
         .i_data(in_data),
         .i_valid(in_valid),
         .i_ready(in_ready),
-        .i_last(in_data[0][VALUE_BITS-1]),
+        .i_last(in_last),
         .i_weights(cnn1weight),
         .i_bias(cnn1bias),
         .o_data(conv1toconv2_data),
@@ -184,7 +186,7 @@ module model #(
         .o_data(out_data),
         .o_valid(out_valid),
         .o_ready(out_ready),
-        .o_last()
+        .o_last(out_last)
     );
 
 endmodule 
