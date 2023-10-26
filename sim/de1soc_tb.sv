@@ -149,7 +149,7 @@ module de1soc_tb();
 
         while (1) begin
             // blocking read until we get first value value
-            read_values(10000000, 5);
+            read_values(10000000, 2);
             if (read_count > 0) begin
                 $display("Read burst result of %d words", read_count);
             end
