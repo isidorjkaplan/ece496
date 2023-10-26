@@ -19,9 +19,15 @@ module de1soc_top(
     assign to_model[0] = signed'(in_data[VALUE_BITS-1:0]); //truncate away upper bits
     assign out_data[VALUE_BITS-1:0] = unsigned'(from_model[0]);
     
+    // Unused out_data bits
     assign out_data[29:VALUE_BITS] = 0; //unused
+    assign out_data[31] = 0;
 
     //TODO update reset to have soft reset coming from in_data
+    logic ready;
+    assign upstream_stall = !ready;
+
+
 
     model m(
         .clk(clock),
@@ -30,12 +36,12 @@ module de1soc_top(
         .in_data(to_model),
         .in_valid(in_valid),
         .in_last(in_data[30]),
-        .in_ready(upstream_stall),
+        .in_ready(ready),
 
         .out_data(from_model),
         .out_valid(out_valid),
         .out_last(out_data[30]),
-        .out_ready(downstream_stall)
+        .out_ready(!downstream_stall)
     );
 
 
