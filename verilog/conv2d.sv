@@ -4,6 +4,7 @@ module conv2d #(
     parameter VALUE_BITS = 32,
     parameter N = 16,
     parameter M = VALUE_BITS - N - 1,
+    parameter N_WEIGHTS = 16,
     parameter OUTPUT_CHANNELS = 1,
     parameter INPUT_CHANNELS = 1,
     parameter RELU = 0
@@ -48,11 +49,11 @@ module conv2d #(
             for(int in_channel = 0; in_channel < INPUT_CHANNELS; in_channel++) begin
                 for(int row = 0; row < KERNAL_SIZE; row++) begin
                     for(int col = 0; col < KERNAL_SIZE; col++) begin
-                        i_weights_per_in[in_channel][out_channel][row][col] = i_weights[out_channel][in_channel][row][col][(16-N)+:VALUE_BITS];
+                        i_weights_per_in[in_channel][out_channel][row][col] = i_weights[out_channel][in_channel][row][col][(N_WEIGHTS-N)+:VALUE_BITS];
                     end
                 end                
             end
-            i_bias_per_out[out_channel] = i_bias[out_channel][(16-N)+:VALUE_BITS];
+            i_bias_per_out[out_channel] = i_bias[out_channel][(N_WEIGHTS-N)+:VALUE_BITS];
         end
     end
 
