@@ -74,11 +74,13 @@ module de1soc_tb();
         logic [7:0] cntrl_byte;
         cntrl_byte = 0;
         // in_row_last_i is the second last bit of cntrl byte
-        cntrl_byte[6] = N==IMG_WIDTH-1;
         cntrl_byte[5:0] = tag;
         for (int i = 0; i < IMG_WIDTH; i+=VALUES_PER_WORD) begin
             for (int j = 0; j < VALUES_PER_WORD; j++) begin
                 values[j] = i+j+N*IMG_WIDTH;
+            end
+            if (i+VALUES_PER_WORD >= IMG_WIDTH) begin
+                cntrl_byte[6] = N==IMG_WIDTH-1;
             end
             write_values(values, cntrl_byte);
         end
