@@ -7,6 +7,7 @@ module conv2d #(
     parameter N_WEIGHTS = 16,
     parameter OUTPUT_CHANNELS = 1,
     parameter INPUT_CHANNELS = 1,
+    parameter STRIDE = 1,
     parameter RELU = 0
 ) (
     // general
@@ -64,8 +65,33 @@ module conv2d #(
 
     // output with ff stuff
     assign o_data = o_data_q;
-    assign o_valid = o_valid_q;
     assign o_last = o_last_q;
+
+    // stride masking of output
+    logic [$clog2(STRIDE-1):0] stride_row_mod_counter;
+    logic [$clog2(STRIDE-1):0] stride_col_mod_counter;
+    logic [$clog2(WIDTH-1):0] stride_col_counter;
+
+    always_ff@(posedge clk) begin
+        if (reset) begin
+            stride_row_mod_counter <= 0;
+            stride_col_mod_counter <= 0;
+            stride_col_counter <= 0;
+        end else if (o_valid_q && o_ready) begin // if the result would actually be latched otherwise don't do anything
+            // Always increment column mod STRIDE, resetting whenever we count STRIDE pixels
+            stride_col_mod_counter <= (stride_col_mod_counter==STRIDE-1)?0:(stride_col_mod_counter+1);
+            // Always increment column, resetting when we get a full row
+            stride_col_counter <= (stride_col_counter == WIDTH-1)?0:stride_col_counter;
+            // If we are about to reset the column we increment the row
+            if (stride_col_counter == WIDTH-1) begin
+                // Increment row mod counter, resetting when we hit STRIDE rows
+                stride_row_mod_counter <= (stride_row_mod_counter == STRIDE-1)?0:(stride_row_mod_counter+1);
+            end
+        end
+    end
+    // Mask for stride purposes
+    assign o_valid = o_valid_q && (stride_row_mod_counter == 0 && stride_col_mod_counter == 0);
+  
 
     // calculate output, which is sum between channels and bias
     always_comb begin

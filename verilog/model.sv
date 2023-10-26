@@ -128,6 +128,7 @@ module model #(
         .KERNAL_SIZE(3),
         .VALUE_BITS(VALUE_BITS),
         .N(N),
+        .STRIDE(2),
         .OUTPUT_CHANNELS(CNN1_OUT_CH),
         .INPUT_CHANNELS(CNN1_IN_CH)
     ) conv1 (
@@ -150,6 +151,7 @@ module model #(
         .KERNAL_SIZE(3),
         .VALUE_BITS(VALUE_BITS),
         .N(N),
+        .STRIDE(2),
         .OUTPUT_CHANNELS(CNN2_OUT_CH),
         .INPUT_CHANNELS(CNN2_IN_CH)
     ) conv2 (
@@ -172,6 +174,7 @@ module model #(
         .KERNAL_SIZE(3),
         .VALUE_BITS(VALUE_BITS),
         .N(N),
+        .STRIDE(2),
         .OUTPUT_CHANNELS(OUTPUT_CHANNELS),
         .INPUT_CHANNELS(CNN3_IN_CH)
     ) conv3 (
