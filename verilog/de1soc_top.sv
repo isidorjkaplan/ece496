@@ -21,15 +21,19 @@ module de1soc_top(
     assign to_model[0] = signed'(in_data[VALUE_BITS-1:0]); //truncate away upper bits
     
     //TODO update reset to have soft reset coming from in_data
-    logic ready;
-    assign upstream_stall = !ready;
 
+    logic model_ready;
     logic model_out_valid;
     logic model_out_last;
 
+    logic soft_reset;
+    assign soft_reset = reset || in_data[31]; // Can write a word which does a soft-reset
+    assign upstream_stall = !model_ready && !soft_reset; // pass model stalling onwards, but also always accept a reset request
+
+
     model m(
         .clk(clock),
-        .reset(reset),
+        .reset(soft_reset),
 
         .in_data(to_model),
         .in_valid(in_valid),
@@ -44,7 +48,7 @@ module de1soc_top(
 
     assign out_data[31] = 0;
     serialize #(.N(OUT_CHANNELS), .DATA_BITS(VALUE_BITS), .WORD_SIZE(29)) ser2par(
-        .clock(clock), .reset(reset), 
+        .clock(clock), .reset(soft_reset), 
         .in_data(from_model), .in_valid(model_out_valid),
         .in_last(model_out_last), .out_last(out_data[30]),
         .out_data(out_data[29:0]), .out_valid(out_valid),
