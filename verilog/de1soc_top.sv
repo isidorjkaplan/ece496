@@ -38,7 +38,7 @@ module de1soc_top(
         .in_data(to_model),
         .in_valid(in_valid),
         .in_last(in_data[30]),
-        .in_ready(ready),
+        .in_ready(model_ready),
 
         .out_data(from_model),
         .out_valid(model_out_valid),
