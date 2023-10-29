@@ -75,7 +75,7 @@ module conv2d #(
     logic [$clog2(OUT_WIDTH-1):0] stride_col_counter;
 
     always_ff@(posedge clk) begin
-        if (reset || (o_valid && o_last && o_ready)) begin
+        if (reset || (o_last && o_ready)) begin
             stride_row_mod_counter <= 0;
             stride_col_mod_counter <= 0;
             stride_col_counter <= 0;
@@ -95,7 +95,7 @@ module conv2d #(
         end
     end
     // Mask for stride purposes
-    assign o_valid = o_valid_q && (o_last || (stride_row_mod_counter == (STRIDE-1) && stride_col_mod_counter == (STRIDE-1)));
+    assign o_valid = o_valid_q && (stride_row_mod_counter == (STRIDE-1) && stride_col_mod_counter == (STRIDE-1));
   
 
     // calculate output, which is sum between channels and bias
@@ -265,6 +265,8 @@ module conv2d_single_in_mult_out #(
             taps_valid_q <= 0;
             taps_last_q <= 0;
             buffer_ready <= 1;
+        end else if (o_ready) begin // last can propogate even if not valid
+            taps_last_q <= buffer_last;
         end
     end
 
@@ -493,8 +495,13 @@ module shift_buffer_array_conv #(
             end
         end
 
+        // Passing next last asynchronously
+        if (i_last && !i_valid && o_ready) begin
+            next_taps_last = 1;
+        end
+
         // if advertising last tap available then have o_valid high
-        if(taps_last_q) o_valid = 1;
+        //if(taps_last_q) o_valid = 1;
     end
 
     // Synchronous logic. We update the state on the positive edge of the clock

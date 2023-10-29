@@ -37,7 +37,7 @@ module de1soc_top(
 
         .in_data(to_model),
         .in_valid(in_valid),
-        .in_last(in_data[30]),
+        .in_last(in_data[30] && in_valid),
         .in_ready(model_ready),
 
         .out_data(from_model),
@@ -55,6 +55,13 @@ module de1soc_top(
         .downstream_stall(downstream_stall), .upstream_stall(upstream_stall_serial)
     );
 
+    initial begin
+        @(posedge clock);
+        while (1) begin
+            @(posedge model_out_last);
+            $display("Got last from model asynchronously");
+        end
+    end
 endmodule 
 
 

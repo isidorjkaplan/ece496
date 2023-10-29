@@ -174,7 +174,7 @@ module model #(
         .KERNAL_SIZE(3),
         .VALUE_BITS(VALUE_BITS),
         .N(N),
-        .STRIDE(10), // Any number > then WIDTH; when i_last raises we round up and send exactly one result
+        .STRIDE(3), 
         .OUTPUT_CHANNELS(OUTPUT_CHANNELS),
         .INPUT_CHANNELS(CNN3_IN_CH)
     ) conv3 (

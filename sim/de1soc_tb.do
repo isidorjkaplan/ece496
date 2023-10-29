@@ -6,7 +6,9 @@ vsim de1soc_tb
 add wave dut/clock
 add wave dut/reset
 
-### add wave dut/m/conv1/*
+add wave dut/m/conv1/*
+add wave dut/m/conv2/*
+add wave dut/m/conv3/*
 
 add wave dut/m/in_valid
 add wave dut/m/conv1/o_valid_q
