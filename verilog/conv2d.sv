@@ -430,7 +430,7 @@ module shift_buffer_array_conv #(
         // Input must be valid, or we are done with the input row
         // Output must be ready to accept 
         // Don't do anything if last tap is on display
-        if ((i_valid || input_done_row_q) && o_ready && !taps_last_q) begin
+        if ((i_valid || input_done_row_q) && o_ready) begin
             
             // Input logic -- Latch as long as we are not done with the input row
             if (!input_done_row_q) begin
@@ -464,7 +464,6 @@ module shift_buffer_array_conv #(
                                 :    (out_row+ram_w_row_select_q-BUFFER_HEIGHT) ]; 
                     // We shift in i_data for the top row as the current value, also mark the tap as last if it is the last data
                     end else begin
-                        next_taps_last = i_last;
                         next_taps[out_row][TAP_WIDTH-1] = i_data;
                     end
                 end
@@ -496,7 +495,7 @@ module shift_buffer_array_conv #(
         end
 
         // Passing next last asynchronously
-        if (i_last && !i_valid && o_ready) begin
+        if (i_last && i_ready) begin
             next_taps_last = 1;
         end
 
