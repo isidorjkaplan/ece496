@@ -265,7 +265,7 @@ module conv2d_single_in_mult_out #(
             taps_valid_q <= 0;
             taps_last_q <= 0;
             buffer_ready <= 1;
-        end else if (o_ready) begin // last can propogate even if not valid
+        end else if (buffer_ready) begin // last can propogate even if not valid
             taps_last_q <= buffer_last;
         end
     end
