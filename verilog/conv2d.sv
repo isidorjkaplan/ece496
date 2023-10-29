@@ -398,8 +398,8 @@ module shift_buffer_array_conv #(
     genvar ram_num;
     generate
         for (ram_num = 0; ram_num < BUFFER_HEIGHT; ram_num++) begin : buffer_rams
-            // Declare duel-port ram with SIMD controls 
-            duel_port_ram #(.VALUE_BITS(VALUE_BITS), .WIDTH(WIDTH)) line_ram(
+            // Declare dual-port ram with SIMD controls 
+            dual_port_ram #(.VALUE_BITS(VALUE_BITS), .WIDTH(WIDTH)) line_ram(
                 .clk(clk), .w_data(i_data), .w_addr(ram_w_addr_q), 
                 // Ram read outputs are stored to a vector, one read address loads one value per row
                 .r_addr(ram_r_addr), .r_data(ram_r_data_q[ram_num]),
@@ -533,8 +533,8 @@ module shift_buffer_array_conv #(
     end
 endmodule 
 
-// A duel-port ram with word-size of VALUE_BITS, and WIDTH elements
-module duel_port_ram #(
+// A dual-port ram with word-size of VALUE_BITS, and WIDTH elements
+module dual_port_ram #(
     parameter VALUE_BITS, 
     parameter WIDTH
 )(
