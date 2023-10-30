@@ -54,13 +54,6 @@ module de1soc_top(
         .out_ready(out_ready), .in_ready(in_ready_serial)
     );
 
-    initial begin
-        @(posedge clock);
-        while (1) begin
-            @(posedge model_out_last);
-            $display("Got last from model asynchronously");
-        end
-    end
 endmodule 
 
 
