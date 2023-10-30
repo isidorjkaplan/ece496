@@ -387,9 +387,9 @@ module max_pooling_layer_single_channel #(
     ) line_ram(
         .clk(clk), 
         .w_data(ram_w_data), 
-        .w_addr(ram_w_addr_q),
+        .w_addr(ram_w_addr_q[$clog2(O_WIDTH)-1:0]),
         .w_valid(write_en),
-        .r_addr(ram_r_addr), 
+        .r_addr(ram_r_addr[$clog2(O_WIDTH)-1:0]), 
         .r_data(ram_r_data)
     );
 
