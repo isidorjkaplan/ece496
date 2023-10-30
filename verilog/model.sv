@@ -4,7 +4,8 @@ module model #(
     parameter N = 12,
     parameter INPUT_WIDTH=28, 
     parameter INPUT_CHANNELS=1, 
-    parameter OUTPUT_CHANNELS = 10
+    parameter OUTPUT_CHANNELS = 10,
+    parameter POOL_SIZE = 2
 )(
     // General signals
     input clk, 
@@ -44,25 +45,41 @@ module model #(
 
     
 
-    // conv1 <-> conv2
-    logic signed [VALUE_BITS-1:0]  conv1toconv2_data[CNN1_OUT_CH];
-    logic                          conv1toconv2_o_valid;
-    logic                          conv2toconv1_o_ready;
-    logic                          conv1toconv2_o_last;
-    // conv2 <-> conv3
+    // conv1(RELU = 1) <-> maxpool1
+    logic signed [VALUE_BITS-1:0]  conv1tomaxpool1_data[CNN1_OUT_CH];
+    logic                          conv1tomaxpool1_o_valid;
+    logic                          maxpool1toconv1_o_ready;
+    logic                          conv1tomaxpool1_o_last;
+    // maxpool1 <-> conv2(RELU = 1)
+    logic signed [VALUE_BITS-1:0]  maxpool1toconv2_data[CNN1_OUT_CH];
+    logic                          maxpool1toconv2_o_valid;
+    logic                          conv2tomaxpool1_o_ready;
+    logic                          maxpool1toconv2_o_last;
+    // conv2(RELU = 1) <-> conv3(RELU = 1)
     logic signed [VALUE_BITS-1:0]  conv2toconv3_data[CNN2_OUT_CH];
     logic                          conv2toconv3_o_valid;
     logic                          conv3toconv2_o_ready;
     logic                          conv2toconv3_o_last;
+    // conv3(RELU = 1) <-> maxpool2
+    logic signed [VALUE_BITS-1:0]  conv3tomaxpool2_data[CNN3_OUT_CH];
+    logic                          conv3tomaxpool2_o_valid;
+    logic                          maxpool2toconv3_o_ready;
+    logic                          conv3tomaxpool2_o_last;
+    // maxpool2 <-> avgpool
+    logic signed [VALUE_BITS-1:0]  maxpool2tosum_data[OUTPUT_CHANNELS];
+    logic                          maxpool2tosum_o_valid;
+    logic                          sumtomaxpool2_o_ready;
+    logic                          maxpool2tosum_o_last;
 
     conv2d #(
         .WIDTH(INPUT_WIDTH),
         .KERNAL_SIZE(3),
         .VALUE_BITS(VALUE_BITS),
         .N(N),
-        .STRIDE(1),
         .OUTPUT_CHANNELS(CNN1_OUT_CH),
-        .INPUT_CHANNELS(CNN1_IN_CH)
+        .INPUT_CHANNELS(CNN1_IN_CH),
+        .STRIDE(1),
+        .RELU(1)
     ) conv1 (
         .clk(clk),
         .reset(reset),
@@ -72,10 +89,29 @@ module model #(
         .i_last(in_last),
         .i_weights(cnn1weight),
         .i_bias(cnn1bias),
-        .o_data(conv1toconv2_data),
-        .o_valid(conv1toconv2_o_valid),
-        .o_ready(conv2toconv1_o_ready),
-        .o_last(conv1toconv2_o_last)
+        .o_data(conv1tomaxpool1_data),
+        .o_valid(conv1tomaxpool1_o_valid),
+        .o_ready(maxpool1toconv1_o_ready),
+        .o_last(conv1tomaxpool1_o_last)
+    );
+
+    maxpool2d #(
+        .WIDTH(26),
+        .POOL_SIZE(POOL_SIZE),
+        .VALUE_BITS(VALUE_BITS),
+        .CHANNELS(CNN1_OUT_CH),
+        .RELU(0)
+    ) maxpool1 (
+        .clk(clk),
+        .reset(reset),
+        .i_data(conv1tomaxpool1_data),
+        .i_valid(conv1tomaxpool1_o_valid),
+        .i_ready(maxpool1toconv1_o_ready),
+        .i_last(conv1tomaxpool1_o_last),
+        .o_data(maxpool1toconv2_data),
+        .o_valid(maxpool1toconv2_o_valid),
+        .o_ready(conv2tomaxpool1_o_ready),
+        .o_last(maxpool1toconv2_o_last)
     );
 
     conv2d #(
@@ -83,16 +119,17 @@ module model #(
         .KERNAL_SIZE(3),
         .VALUE_BITS(VALUE_BITS),
         .N(N),
-        .STRIDE(1),
         .OUTPUT_CHANNELS(CNN2_OUT_CH),
-        .INPUT_CHANNELS(CNN2_IN_CH)
+        .INPUT_CHANNELS(CNN2_IN_CH),        
+        .STRIDE(1),
+        .RELU(1)
     ) conv2 (
         .clk(clk),
         .reset(reset),
-        .i_data(conv1toconv2_data),
-        .i_valid(conv1toconv2_o_valid),
-        .i_ready(conv2toconv1_o_ready),
-        .i_last(conv1toconv2_o_last),
+        .i_data(maxpool1toconv2_data),
+        .i_valid(maxpool1toconv2_o_valid),
+        .i_ready(conv2tomaxpool1_o_ready),
+        .i_last(maxpool1toconv2_o_last),
         .i_weights(cnn2weight),
         .i_bias(cnn2bias),
         .o_data(conv2toconv3_data),
@@ -102,13 +139,14 @@ module model #(
     );
 
     conv2d #(
-        .WIDTH(5),
+        .WIDTH(11),
         .KERNAL_SIZE(3),
         .VALUE_BITS(VALUE_BITS),
-        .N(N),
-        .STRIDE(1), 
+        .N(N), 
         .OUTPUT_CHANNELS(OUTPUT_CHANNELS),
-        .INPUT_CHANNELS(CNN3_IN_CH)
+        .INPUT_CHANNELS(CNN3_IN_CH),
+        .STRIDE(1),
+        .RELU(1)
     ) conv3 (
         .clk(clk),
         .reset(reset),
@@ -118,11 +156,50 @@ module model #(
         .i_last(conv2toconv3_o_last),
         .i_weights(cnn3weight),
         .i_bias(cnn3bias),
+        .o_data(conv3tomaxpool2_data),
+        .o_valid(conv3tomaxpool2_o_valid),
+        .o_ready(maxpool2toconv3_o_ready),
+        .o_last(conv3tomaxpool2_o_last)
+    );
+
+    maxpool2d #(
+        .WIDTH(9),
+        .POOL_SIZE(POOL_SIZE),
+        .VALUE_BITS(VALUE_BITS),
+        .CHANNELS(CNN3_OUT_CH),
+        .RELU(0)
+    ) maxpool2 (
+        .clk(clk),
+        .reset(reset),
+        .i_data(conv3tomaxpool2_data),
+        .i_valid(conv3tomaxpool2_o_valid),
+        .i_ready(maxpool2toconv3_o_ready),
+        .i_last(conv3tomaxpool2_o_last),
+        .o_data(maxpool2tosum_data),
+        .o_valid(maxpool2tosum_o_valid),
+        .o_ready(sumtomaxpool2_o_ready),
+        .o_last(maxpool2tosum_o_last)
+    );    
+
+    sum #(
+        .WIDTH(4),
+        .VALUE_BITS(VALUE_BITS),
+        .CHANNELS(CNN3_OUT_CH),
+        .N(N)
+    ) sum1 (
+        .clk(clk),
+        .reset(reset),
+        .i_data(maxpool2tosum_data),
+        .i_valid(maxpool2tosum_o_valid),
+        .i_ready(sumtomaxpool2_o_ready),
+        .i_last(maxpool2tosum_o_last),
         .o_data(out_data),
         .o_valid(out_valid),
         .o_ready(out_ready),
         .o_last(out_last)
     );
+
+
 
     // weights logics
     always_comb begin

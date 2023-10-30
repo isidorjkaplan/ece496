@@ -218,7 +218,9 @@ module conv2d_single_in_mult_out #(
     logic                               dsp_counter;
 
     assign o_valid = o_valid_q;
-    assign o_last = taps_last_q;
+    // if we do have a valid tap to send, then don't show last until its completed
+    // or else propogate the last signal
+    assign o_last = taps_valid_q ? (taps_last_q && o_valid_q) : (taps_last_q);
     assign o_data = o_data_q;
 
     shift_buffer_array_conv #(
@@ -265,7 +267,9 @@ module conv2d_single_in_mult_out #(
             taps_valid_q <= 0;
             taps_last_q <= 0;
             buffer_ready <= 1;
-        end else if (buffer_ready) begin // last can propogate even if not valid
+        end 
+        // last can propogate even if not valid
+        else if (buffer_ready) begin 
             taps_last_q <= buffer_last;
         end
     end

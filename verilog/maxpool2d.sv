@@ -1,4 +1,4 @@
-module max_pooling_layer #(
+module maxpool2d #(
     parameter WIDTH = 28, 
     parameter POOL_SIZE = 2, 
     parameter VALUE_BITS = 32, 
@@ -40,11 +40,11 @@ module max_pooling_layer #(
             ) maxpool (
                 .clk(clk),
                 .reset(reset),
-                .i_data(i_data),
+                .i_data(i_data[i]),
                 .i_valid(i_valid),
                 .i_ready(i_readys[i]),
                 .i_last(i_last),
-                .o_data(o_data),
+                .o_data(o_data[i]),
                 .o_valid(o_valids[i]),
                 .o_ready(o_ready),
                 .o_last(o_lasts[i])
@@ -95,10 +95,10 @@ module max_pooling_layer_single_channel #(
     logic                           reset_now;              // combinationally asserted
 
     // ram logic
-    logic [$clog2(O_WIDTH)-1:0]     ram_w_addr_q; 
-    logic [$clog2(O_WIDTH)-1:0]     next_ram_w_addr; 
-    logic [$clog2(O_WIDTH)-1:0]     ram_r_addr;
-    logic [$clog2(O_WIDTH)-1:0]     prev_ram_r_addr_q;
+    logic [$clog2(O_WIDTH):0]       ram_w_addr_q; 
+    logic [$clog2(O_WIDTH):0]       next_ram_w_addr; 
+    logic [$clog2(O_WIDTH):0]       ram_r_addr;
+    logic [$clog2(O_WIDTH):0]       prev_ram_r_addr_q;
     logic signed [VALUE_BITS-1:0]   ram_r_data;
     logic signed [VALUE_BITS-1:0]   ram_w_data;
     logic                           write_en;
