@@ -1,11 +1,11 @@
 module tb();
     // Define some local parameters useful for simulation
-    localparam VALUE_BITS = 24;
+    localparam VALUE_BITS = 22;
     localparam N = 12;
     localparam CLK_PERIOD = 20;                    // Clock period is 20ns
     localparam QSTEP = CLK_PERIOD/4;                // Time step of a quarter of a clock period
     localparam TIMESTEP = CLK_PERIOD/10;        // Time step of one tenth of a clock period
-    localparam POOL_SIZE = 2;                    // Convolution filter size (3x3)
+    localparam POOL_SIZE = 1;                    // Convolution filter size (3x3)
     localparam CHANNELS = 4;
     // You have to set the project directory for the testbench to operate correctly
     localparam PROJECT_DIR = "";
@@ -39,7 +39,8 @@ module tb();
     max_pooling_layer_single_channel #(
         .WIDTH(28), 
         .POOL_SIZE(POOL_SIZE), 
-        .VALUE_BITS(VALUE_BITS)
+        .VALUE_BITS(VALUE_BITS),
+        .RELU(1)
     ) dut (
         .clk(clk),
         .reset(reset),
@@ -65,6 +66,7 @@ module tb();
     integer current_time = 0;
     logic ready_stall_tested = 0;
     integer repeatCount;
+    logic got_last;
 
     // Producer Process
     initial begin
@@ -101,7 +103,7 @@ module tb();
             // Prepare an input value (if it is first or last pixel of the row, insert zero for padding in case of a 3x3 filte. Otherwise, insert pixel)
             temp = $fscanf(test_image, "%d ", pixel_val); 
 
-            i_data = pixel_val << N;
+            i_data = (pixel_val << N);
             saved_i_x = i_data;
             if(pixel_id == (image_width*image_height)-1) begin
                 i_last = 1;
@@ -247,7 +249,7 @@ module tb();
         current_time = current_time + (CLK_PERIOD - TIMESTEP);
 
         for(repeatCount = 0; repeatCount < 2; repeatCount = repeatCount+1)begin
-            
+            got_last = 0;
             // Open files to write the result image, difference image and simulation log
             result_image = $fopen({PROJECT_DIR, $sformatf("mnist/pool_out_%0d.pgm", repeatCount)}, "w");
             // Write result image PGM header
@@ -266,6 +268,16 @@ module tb();
                     $fwrite(result_image, "%d ", o_data[N+:(VALUE_BITS-N)]);
                     // Increment our loop counter
                     out_id = out_id + 1;
+                    // if o_last is asserted
+                    if(o_last) begin
+                        if(out_id < ((image_width/POOL_SIZE) * (image_height/POOL_SIZE))) begin
+                            $display("got o_last earlier than expected\n");
+                        end
+                        else if(out_id == ((image_width/POOL_SIZE) * (image_height/POOL_SIZE))) begin
+                            $display("got o_last with last pixel\n");
+                        end
+                        got_last = 1;
+                    end
                 end
                 
                 // Advance to positive edge
@@ -296,6 +308,13 @@ module tb();
             end
 
             $fclose(result_image);
+            if(got_last == 0) begin
+                while(!o_last) begin
+                    #(CLK_PERIOD);
+                end
+                got_last = 1;
+                #(CLK_PERIOD);
+            end
             
         end
         #100;

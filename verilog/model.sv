@@ -2,8 +2,9 @@
 module model #(
     parameter VALUE_BITS = 18,
     parameter N = 12,
-    // DO NOT CHANGE BELOW VALUES
-    INPUT_WIDTH=28, INPUT_CHANNELS=1, OUTPUT_CHANNELS = 10
+    parameter INPUT_WIDTH=28, 
+    parameter INPUT_CHANNELS=1, 
+    parameter OUTPUT_CHANNELS = 10
 )(
     // General signals
     input clk, 
@@ -41,54 +42,7 @@ module model #(
     localparam [32*CNN3_OUT_CH-1:0]                 PARAMCNN3BIAS = {32'd66299, -32'd6688, 32'd38521, -32'd12491, -32'd495, 32'd18486, -32'd6314, 32'd111662, 32'd4264, -32'd48027};
     logic signed [32-1:0]                           cnn3bias[CNN3_OUT_CH];
 
-    always_comb begin
-        // cnn1 weights
-        for(int o_channel = 0; o_channel < CNN1_OUT_CH; o_channel++) begin
-            for(int i_channel = 0; i_channel < CNN1_IN_CH; i_channel++) begin
-                for(int row = 0; row < 3; row++) begin
-                    for(int col = 0; col < 3; col++) begin
-                        cnn1weight[o_channel][i_channel][row][col] = PARAMCNN1WEIGHT[((32*CNN1_OUT_CH*CNN1_IN_CH*9-1) - (o_channel*CNN1_IN_CH*9*32) - (i_channel*9*32) - (row*3*32) - (col*32))-:32];
-                    end
-                end
-            end
-        end
-        // cnn1 bias
-        for(int o_channel = 0; o_channel < CNN1_OUT_CH; o_channel++) begin
-            cnn1bias[o_channel] = PARAMCNN1BIAS[(32*CNN1_OUT_CH-1) - (o_channel*32) -:32];
-        end
-        // cnn2 weights
-        for(int o_channel = 0; o_channel < CNN2_OUT_CH; o_channel++) begin
-            for(int i_channel = 0; i_channel < CNN2_IN_CH; i_channel++) begin
-                for(int row = 0; row < 3; row++) begin
-                    for(int col = 0; col < 3; col++) begin
-                        // cnn2weight[o_channel][i_channel][row][col] = PARAMCNN2WEIGHT[((32*CNN2_OUT_CH*CNN2_IN_CH*9-1) - (o_channel*CNN2_IN_CH*9*32) - (i_channel*9*32) - (row*3*32) - (col*32))-:32];
-                        cnn2weight[o_channel][i_channel][row][col] = 2 << N;
-                    end
-                end
-            end
-        end
-        // cnn2 bias
-        for(int o_channel = 0; o_channel < CNN2_OUT_CH; o_channel++) begin
-            // cnn2bias[o_channel] = PARAMCNN2BIAS[(32*CNN2_OUT_CH-1) - (o_channel*32) -:32];
-            cnn2bias[o_channel] = 0;
-        end
-        // cnn3 weights
-        for(int o_channel = 0; o_channel < CNN3_OUT_CH; o_channel++) begin
-            for(int i_channel = 0; i_channel < CNN3_IN_CH; i_channel++) begin
-                for(int row = 0; row < 3; row++) begin
-                    for(int col = 0; col < 3; col++) begin
-                        // cnn3weight[o_channel][i_channel][row][col] = PARAMCNN3WEIGHT[((32*CNN3_OUT_CH*CNN3_IN_CH*9-1) - (o_channel*CNN3_IN_CH*9*32) - (i_channel*9*32) - (row*3*32) - (col*32))-:32];
-                        cnn3weight[o_channel][i_channel][row][col] = 1 << N;
-                    end
-                end
-            end
-        end
-        // cnn3 bias
-        for(int o_channel = 0; o_channel < CNN3_OUT_CH; o_channel++) begin
-            // cnn3bias[o_channel] = PARAMCNN3BIAS[(32*CNN3_OUT_CH-1) - (o_channel*32) -:32];
-            cnn3bias[o_channel] = 0;
-        end
-    end
+    
 
     // conv1 <-> conv2
     logic signed [VALUE_BITS-1:0]  conv1toconv2_data[CNN1_OUT_CH];
@@ -101,34 +55,12 @@ module model #(
     logic                          conv3toconv2_o_ready;
     logic                          conv2toconv3_o_last;
 
-    // conv2d #(
-    //     .WIDTH(INPUT_WIDTH),
-    //     .KERNAL_SIZE(3),
-    //     .VALUE_BITS(18),
-    //     .N(12),
-    //     .OUTPUT_CHANNELS(1),
-    //     .INPUT_CHANNELS(1)
-    // ) convtest (
-    //     .clk(clk),
-    //     .reset(reset),
-    //     .i_data(in_data),
-    //     .i_valid(in_valid),
-    //     .i_ready(in_ready),
-    //     .i_last(in_data[0][VALUE_BITS-1]),
-    //     .i_weights(cnn1weight[0:0]),
-    //     .i_bias(cnn1bias[0:0]),
-    //     .o_data(out_data[0:0]),
-    //     .o_valid(out_valid),
-    //     .o_ready(out_ready),
-    //     .o_last(conv1toconv2_o_last)
-    // );
-
     conv2d #(
         .WIDTH(INPUT_WIDTH),
         .KERNAL_SIZE(3),
         .VALUE_BITS(VALUE_BITS),
         .N(N),
-        .STRIDE(2),
+        .STRIDE(1),
         .OUTPUT_CHANNELS(CNN1_OUT_CH),
         .INPUT_CHANNELS(CNN1_IN_CH)
     ) conv1 (
@@ -151,7 +83,7 @@ module model #(
         .KERNAL_SIZE(3),
         .VALUE_BITS(VALUE_BITS),
         .N(N),
-        .STRIDE(2),
+        .STRIDE(1),
         .OUTPUT_CHANNELS(CNN2_OUT_CH),
         .INPUT_CHANNELS(CNN2_IN_CH)
     ) conv2 (
@@ -174,7 +106,7 @@ module model #(
         .KERNAL_SIZE(3),
         .VALUE_BITS(VALUE_BITS),
         .N(N),
-        .STRIDE(3), 
+        .STRIDE(1), 
         .OUTPUT_CHANNELS(OUTPUT_CHANNELS),
         .INPUT_CHANNELS(CNN3_IN_CH)
     ) conv3 (
@@ -191,6 +123,56 @@ module model #(
         .o_ready(out_ready),
         .o_last(out_last)
     );
+
+    // weights logics
+    always_comb begin
+        // cnn1 weights
+        for(int o_channel = 0; o_channel < CNN1_OUT_CH; o_channel++) begin
+            for(int i_channel = 0; i_channel < CNN1_IN_CH; i_channel++) begin
+                for(int row = 0; row < 3; row++) begin
+                    for(int col = 0; col < 3; col++) begin
+                        cnn1weight[o_channel][i_channel][row][col] = PARAMCNN1WEIGHT[((32*CNN1_OUT_CH*CNN1_IN_CH*9-1) - (o_channel*CNN1_IN_CH*9*32) - (i_channel*9*32) - (row*3*32) - (col*32))-:32];
+                    end
+                end
+            end
+        end
+        // cnn1 bias
+        for(int o_channel = 0; o_channel < CNN1_OUT_CH; o_channel++) begin
+            cnn1bias[o_channel] = PARAMCNN1BIAS[(32*CNN1_OUT_CH-1) - (o_channel*32) -:32];
+        end
+        // cnn2 weights
+        for(int o_channel = 0; o_channel < CNN2_OUT_CH; o_channel++) begin
+            for(int i_channel = 0; i_channel < CNN2_IN_CH; i_channel++) begin
+                for(int row = 0; row < 3; row++) begin
+                    for(int col = 0; col < 3; col++) begin
+                        cnn2weight[o_channel][i_channel][row][col] = PARAMCNN2WEIGHT[((32*CNN2_OUT_CH*CNN2_IN_CH*9-1) - (o_channel*CNN2_IN_CH*9*32) - (i_channel*9*32) - (row*3*32) - (col*32))-:32];
+                        // cnn2weight[o_channel][i_channel][row][col] = 2 << N;
+                    end
+                end
+            end
+        end
+        // cnn2 bias
+        for(int o_channel = 0; o_channel < CNN2_OUT_CH; o_channel++) begin
+            cnn2bias[o_channel] = PARAMCNN2BIAS[(32*CNN2_OUT_CH-1) - (o_channel*32) -:32];
+            // cnn2bias[o_channel] = 0;
+        end
+        // cnn3 weights
+        for(int o_channel = 0; o_channel < CNN3_OUT_CH; o_channel++) begin
+            for(int i_channel = 0; i_channel < CNN3_IN_CH; i_channel++) begin
+                for(int row = 0; row < 3; row++) begin
+                    for(int col = 0; col < 3; col++) begin
+                        cnn3weight[o_channel][i_channel][row][col] = PARAMCNN3WEIGHT[((32*CNN3_OUT_CH*CNN3_IN_CH*9-1) - (o_channel*CNN3_IN_CH*9*32) - (i_channel*9*32) - (row*3*32) - (col*32))-:32];
+                        // cnn3weight[o_channel][i_channel][row][col] = 1 << N;
+                    end
+                end
+            end
+        end
+        // cnn3 bias
+        for(int o_channel = 0; o_channel < CNN3_OUT_CH; o_channel++) begin
+            cnn3bias[o_channel] = PARAMCNN3BIAS[(32*CNN3_OUT_CH-1) - (o_channel*32) -:32];
+            // cnn3bias[o_channel] = 0;
+        end
+    end
 
 endmodule 
 

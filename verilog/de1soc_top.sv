@@ -6,12 +6,11 @@ module de1soc_top(
 
     input wire [ 31 : 0 ] in_data,
     input wire in_valid,
+    output wire in_ready,
 
     output reg [ 31 : 0 ] out_data,
     output reg out_valid, 
-
-    input wire downstream_stall,
-    output wire upstream_stall
+    input wire out_ready    
 );
     localparam VALUE_BITS=18;
     localparam OUT_CHANNELS=10;
@@ -28,7 +27,7 @@ module de1soc_top(
 
     logic soft_reset;
     assign soft_reset = reset || in_data[31]; // Can write a word which does a soft-reset
-    assign upstream_stall = !model_ready && !soft_reset; // pass model stalling onwards, but also always accept a reset request
+    assign in_ready = !model_ready && !soft_reset; // pass model stalling onwards, but also always accept a reset request
 
 
     model m(
@@ -43,7 +42,7 @@ module de1soc_top(
         .out_data(from_model),
         .out_valid(model_out_valid),
         .out_last(model_out_last),
-        .out_ready(!upstream_stall_serial)
+        .out_ready(!in_ready_serial)
     );
 
     assign out_data[31] = 0;
@@ -52,7 +51,7 @@ module de1soc_top(
         .in_data(from_model), .in_valid(model_out_valid),
         .in_last(model_out_last), .out_last(out_data[30]),
         .out_data(out_data[29:0]), .out_valid(out_valid),
-        .downstream_stall(downstream_stall), .upstream_stall(upstream_stall_serial)
+        .out_ready(out_ready), .in_ready(in_ready_serial)
     );
 
     initial begin
@@ -78,8 +77,8 @@ module serialize #(parameter N, DATA_BITS, DATA_PER_WORD=1, WORD_SIZE=32) (
     output reg out_valid, 
     output reg out_last,
 
-    input wire downstream_stall,
-    output wire upstream_stall
+    input wire out_ready,
+    output wire in_ready
 );
     logic buffer_valid;
     logic signed [ DATA_BITS-1 : 0 ] data_buffer[N];
@@ -95,7 +94,7 @@ module serialize #(parameter N, DATA_BITS, DATA_PER_WORD=1, WORD_SIZE=32) (
             data_buffer <= in_data;
             buffer_valid <= 1;
         end 
-        else if (!downstream_stall && buffer_valid) begin
+        else if (!out_ready && buffer_valid) begin
             data_idx <= (data_idx + DATA_PER_WORD);
             if (data_idx+DATA_PER_WORD >= N) begin
                 data_idx <= 0;
@@ -106,7 +105,7 @@ module serialize #(parameter N, DATA_BITS, DATA_PER_WORD=1, WORD_SIZE=32) (
 
     assign out_last = in_last && (data_idx + DATA_PER_WORD >= N);
 
-    assign upstream_stall = buffer_valid;
+    assign in_ready = buffer_valid;
     assign out_valid = buffer_valid;
 
     always_comb begin
@@ -132,18 +131,18 @@ module axi_buffer(
     output reg [ 31 : 0 ] out_data,
     output reg out_valid, 
 
-    input wire downstream_stall,
-    output wire upstream_stall
+    input wire out_ready,
+    output wire in_ready
 );
 
-    assign upstream_stall = out_valid && downstream_stall;
+    assign in_ready = out_valid && out_ready;
     
     always_ff@(posedge clock) begin
         if (reset) begin
             out_data <= 0;
             out_valid <= 0;
         end
-        else if (!downstream_stall || !out_valid) begin
+        else if (!out_ready || !out_valid) begin
             out_data <= in_data;
             out_valid <= in_valid;
         end  

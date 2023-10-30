@@ -32,7 +32,7 @@ module de1soc_tb();
 	// Outputs
 	.out_data(out_data), .out_valid(out_valid), 
 	// Control Flow
-	.downstream_stall(downstream_stall), .upstream_stall(upstream_stall));
+	.out_ready(downstream_stall), .in_ready(upstream_stall));
 
     task automatic send_word(logic [31:0] word);
     begin
