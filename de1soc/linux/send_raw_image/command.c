@@ -171,7 +171,7 @@ int main (int argc, char *argv[])
 			for (x = 0; x < X; x++) {
 				// Write pixel data
 				FIFO_WRITE_BLOCK( 
-					((x + y/2 + img_num)&0x3FFFF) // Pixel Data
+					(((x + y/2 + img_num)<<8)&0x3FFFF) // Pixel Data
 					| (((y==(Y-1) && x == (X-1))&0xFF)<<30)	// Last pixel flag
 				);
 			}
