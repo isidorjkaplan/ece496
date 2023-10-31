@@ -1,10 +1,10 @@
 // Input is streamed where we recieve an image as 28*28 individual transfers with the grayscale values
 module model #(
-    parameter VALUE_BITS = 18,
-    parameter VALUE_Q_FORMAT_N = 12,
-    parameter INPUT_WIDTH=28, 
-    parameter INPUT_CHANNELS=1, 
-    parameter OUTPUT_CHANNELS = 10,
+    parameter VALUE_BITS,
+    parameter VALUE_Q_FORMAT_N,
+    parameter INPUT_WIDTH, 
+    parameter INPUT_CHANNELS, 
+    parameter OUTPUT_CHANNELS,
     parameter POOL_SIZE = 2
 )(
     // General signals
@@ -76,6 +76,7 @@ module model #(
         .KERNAL_SIZE(3),
         .VALUE_BITS(VALUE_BITS),
         .VALUE_Q_FORMAT_N(VALUE_Q_FORMAT_N),
+        .WEIGHTS_Q_FORMAT_N(16),
         .OUTPUT_CHANNELS(CNN1_OUT_CH),
         .INPUT_CHANNELS(CNN1_IN_CH),
         .STRIDE(1),
@@ -119,6 +120,7 @@ module model #(
         .KERNAL_SIZE(3),
         .VALUE_BITS(VALUE_BITS),
         .VALUE_Q_FORMAT_N(VALUE_Q_FORMAT_N),
+        .WEIGHTS_Q_FORMAT_N(16),
         .OUTPUT_CHANNELS(CNN2_OUT_CH),
         .INPUT_CHANNELS(CNN2_IN_CH),        
         .STRIDE(1),
@@ -143,6 +145,7 @@ module model #(
         .KERNAL_SIZE(3),
         .VALUE_BITS(VALUE_BITS),
         .VALUE_Q_FORMAT_N(VALUE_Q_FORMAT_N), 
+        .WEIGHTS_Q_FORMAT_N(16),
         .OUTPUT_CHANNELS(OUTPUT_CHANNELS),
         .INPUT_CHANNELS(CNN3_IN_CH),
         .STRIDE(1),

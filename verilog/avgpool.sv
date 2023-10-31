@@ -1,8 +1,8 @@
 module sum #(
-    parameter WIDTH = 28, 
-    parameter VALUE_BITS = 32, 
-    parameter CHANNELS = 1,
-    parameter VALUE_Q_FORMAT_N = 16
+    parameter WIDTH, 
+    parameter VALUE_BITS, 
+    parameter CHANNELS,
+    parameter VALUE_Q_FORMAT_N
 ) (
     // general
     input   logic                               clk,                // Operating clock

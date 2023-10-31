@@ -1,9 +1,9 @@
 module maxpool2d #(
-    parameter WIDTH = 28, 
-    parameter POOL_SIZE = 2, 
-    parameter VALUE_BITS = 32, 
-    parameter CHANNELS = 1,
-    parameter RELU = 0
+    parameter WIDTH, 
+    parameter POOL_SIZE, 
+    parameter VALUE_BITS, 
+    parameter CHANNELS,
+    parameter RELU
 ) (
     // general
     input   logic                               clk,                // Operating clock
@@ -55,10 +55,10 @@ module maxpool2d #(
 endmodule 
 
 module max_pooling_layer_single_channel #(
-    parameter WIDTH = 28, 
-    parameter POOL_SIZE = 2, 
-    parameter VALUE_BITS = 32,
-    parameter RELU = 0
+    parameter WIDTH, 
+    parameter POOL_SIZE, 
+    parameter VALUE_BITS,
+    parameter RELU
 ) (
     // general
     input   logic                               clk,        // Operating clock

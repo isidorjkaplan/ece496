@@ -1,13 +1,13 @@
 module conv2d #(
-    parameter WIDTH = 28, 
-    parameter KERNAL_SIZE = 3, 
-    parameter VALUE_BITS = 32,
-    parameter VALUE_Q_FORMAT_N = 16,
-    parameter WEIGHTS_Q_FORMAT_N = 16,
-    parameter OUTPUT_CHANNELS = 1,
-    parameter INPUT_CHANNELS = 1,
-    parameter STRIDE = 1,
-    parameter RELU = 0
+    parameter WIDTH, 
+    parameter KERNAL_SIZE, 
+    parameter VALUE_BITS,
+    parameter VALUE_Q_FORMAT_N,
+    parameter WEIGHTS_Q_FORMAT_N,
+    parameter OUTPUT_CHANNELS,
+    parameter INPUT_CHANNELS,
+    parameter STRIDE,
+    parameter RELU
 ) (
     // general
     input   logic                               clk,                                    // Operating clock
@@ -169,10 +169,10 @@ endmodule
 // output valid once everything is generated
 module conv2d_single_in_mult_out #(
     parameter WIDTH, 
-    parameter KERNAL_SIZE = 3, 
-    parameter VALUE_BITS = 32,
-    parameter VALUE_Q_FORMAT_N = 16,
-    parameter OUTPUT_CHANNELS = 1
+    parameter KERNAL_SIZE, 
+    parameter VALUE_BITS,
+    parameter VALUE_Q_FORMAT_N,
+    parameter OUTPUT_CHANNELS
 ) (
     // general
     input   logic                               clk,                                    // Operating clock
