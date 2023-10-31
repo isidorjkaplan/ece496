@@ -138,7 +138,8 @@ void initFPGABus() {
   	// Get the address that maps to the FIFO read/write ports
 	FIFO_write_ptr =(unsigned int *)(h2p_virtual_base);
 	FIFO_read_ptr = (unsigned int *)(h2p_virtual_base + 0x10); //0x10
-
+    // Reset the FPGA since server just started
+    FIFO_WRITE_BLOCK(1<<31); //RESET signal
 	// give the FPGA time to finish working
 	usleep(30000);  
 	// Flush any initial contents on the Queue
@@ -164,19 +165,21 @@ void recvFromFPGA(int* buf) {
 // Hard-coded buffer size
 void sendToFPGA(char* buf) {
     const int X = 28;
-    const int Y = 28;
+    const int Y = X;
     // This is a feature of the neural network architecture chosen
     const int NUM_ROWS_FOR_VALID_OUTPUT = 28;
     const int RESULT_WIDTH = 7;
     const int RESULT_CHANNELS = 10;
+    const int INPUT_SHIFT = 7;
     
     int x, y;
     int out_row_count = 0;
     for (y=0; y < Y; y++) {
         for (x=0; x < X; x++) {
-            FIFO_WRITE_BLOCK((int)(unsigned char)buf[x + 28*y]);
+            FIFO_WRITE_BLOCK((int)(unsigned char)buf[x + X*y] << INPUT_SHIFT);
         }
     }
+    FIFO_WRITE_BLOCK(1<<30); //DONE signal
     
 }
 
