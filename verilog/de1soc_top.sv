@@ -33,7 +33,7 @@ module de1soc_top(
 
     model #(
         .VALUE_BITS(VALUE_BITS),
-        .N(8),
+        .VALUE_Q_FORMAT_N(8),
         .INPUT_WIDTH(28), 
         .INPUT_CHANNELS(1), 
         .OUTPUT_CHANNELS(OUT_CHANNELS)

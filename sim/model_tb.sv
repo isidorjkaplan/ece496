@@ -37,7 +37,7 @@ module tb();
     // Instantiation of the DUT circuit
     model #(
         .VALUE_BITS(VALUE_BITS), 
-        .N(N), 
+        .VALUE_Q_FORMAT_N(N), 
         .INPUT_WIDTH(INPUT_WIDTH),
         .INPUT_CHANNELS(INPUT_CHANNELS),
         .OUTPUT_CHANNELS(OUTPUT_CHANNELS)

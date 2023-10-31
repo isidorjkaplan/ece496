@@ -1,7 +1,7 @@
 // Input is streamed where we recieve an image as 28*28 individual transfers with the grayscale values
 module model #(
     parameter VALUE_BITS = 18,
-    parameter N = 12,
+    parameter VALUE_Q_FORMAT_N = 12,
     parameter INPUT_WIDTH=28, 
     parameter INPUT_CHANNELS=1, 
     parameter OUTPUT_CHANNELS = 10,
@@ -75,7 +75,7 @@ module model #(
         .WIDTH(INPUT_WIDTH),
         .KERNAL_SIZE(3),
         .VALUE_BITS(VALUE_BITS),
-        .N(N),
+        .VALUE_Q_FORMAT_N(VALUE_Q_FORMAT_N),
         .OUTPUT_CHANNELS(CNN1_OUT_CH),
         .INPUT_CHANNELS(CNN1_IN_CH),
         .STRIDE(1),
@@ -118,7 +118,7 @@ module model #(
         .WIDTH(13),
         .KERNAL_SIZE(3),
         .VALUE_BITS(VALUE_BITS),
-        .N(N),
+        .VALUE_Q_FORMAT_N(VALUE_Q_FORMAT_N),
         .OUTPUT_CHANNELS(CNN2_OUT_CH),
         .INPUT_CHANNELS(CNN2_IN_CH),        
         .STRIDE(1),
@@ -142,7 +142,7 @@ module model #(
         .WIDTH(11),
         .KERNAL_SIZE(3),
         .VALUE_BITS(VALUE_BITS),
-        .N(N), 
+        .VALUE_Q_FORMAT_N(VALUE_Q_FORMAT_N), 
         .OUTPUT_CHANNELS(OUTPUT_CHANNELS),
         .INPUT_CHANNELS(CNN3_IN_CH),
         .STRIDE(1),
@@ -185,7 +185,7 @@ module model #(
         .WIDTH(4),
         .VALUE_BITS(VALUE_BITS),
         .CHANNELS(CNN3_OUT_CH),
-        .N(N)
+        .VALUE_Q_FORMAT_N(VALUE_Q_FORMAT_N)
     ) sum1 (
         .clk(clk),
         .reset(reset),

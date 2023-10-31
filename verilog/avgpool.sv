@@ -2,7 +2,7 @@ module sum #(
     parameter WIDTH = 28, 
     parameter VALUE_BITS = 32, 
     parameter CHANNELS = 1,
-    parameter N = 16
+    parameter VALUE_Q_FORMAT_N = 16
 ) (
     // general
     input   logic                               clk,                // Operating clock
@@ -41,7 +41,7 @@ module sum #(
         // accumulate only integer portion
         else if(i_ready && i_valid) begin
             for(int i = 0; i < CHANNELS; i++)
-                sum[i] <= sum[i] + (i_data[i] >> (N));
+                sum[i] <= sum[i] + (i_data[i] >> (VALUE_Q_FORMAT_N));
         end
     end
 

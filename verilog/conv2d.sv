@@ -2,9 +2,8 @@ module conv2d #(
     parameter WIDTH = 28, 
     parameter KERNAL_SIZE = 3, 
     parameter VALUE_BITS = 32,
-    parameter N = 16,
-    parameter M = VALUE_BITS - N - 1,
-    parameter N_WEIGHTS = 16,
+    parameter VALUE_Q_FORMAT_N = 16,
+    parameter WEIGHTS_Q_FORMAT_N = 16,
     parameter OUTPUT_CHANNELS = 1,
     parameter INPUT_CHANNELS = 1,
     parameter STRIDE = 1,
@@ -52,11 +51,11 @@ module conv2d #(
             for(int in_channel = 0; in_channel < INPUT_CHANNELS; in_channel++) begin
                 for(int row = 0; row < KERNAL_SIZE; row++) begin
                     for(int col = 0; col < KERNAL_SIZE; col++) begin
-                        i_weights_per_in[in_channel][out_channel][row][col] = i_weights[out_channel][in_channel][row][col][(N_WEIGHTS-N)+:VALUE_BITS];
+                        i_weights_per_in[in_channel][out_channel][row][col] = i_weights[out_channel][in_channel][row][col][(WEIGHTS_Q_FORMAT_N-VALUE_Q_FORMAT_N)+:VALUE_BITS];
                     end
                 end                
             end
-            i_bias_per_out[out_channel] = i_bias[out_channel][(N_WEIGHTS-N)+:VALUE_BITS];
+            i_bias_per_out[out_channel] = i_bias[out_channel][(WEIGHTS_Q_FORMAT_N-VALUE_Q_FORMAT_N)+:VALUE_BITS];
         end
     end
 
@@ -145,7 +144,7 @@ module conv2d #(
                 .WIDTH(WIDTH),
                 .KERNAL_SIZE(KERNAL_SIZE),
                 .VALUE_BITS(VALUE_BITS),
-                .N(N),
+                .VALUE_Q_FORMAT_N(VALUE_Q_FORMAT_N),
                 .OUTPUT_CHANNELS(OUTPUT_CHANNELS)
             ) channel(
                 .clk(clk),
@@ -172,8 +171,7 @@ module conv2d_single_in_mult_out #(
     parameter WIDTH, 
     parameter KERNAL_SIZE = 3, 
     parameter VALUE_BITS = 32,
-    parameter N = 16,
-    parameter M = VALUE_BITS - N - 1,
+    parameter VALUE_Q_FORMAT_N = 16,
     parameter OUTPUT_CHANNELS = 1
 ) (
     // general
@@ -330,7 +328,7 @@ module conv2d_single_in_mult_out #(
     always_comb begin
         next_o_data = '0;
         for(int idx = 0; idx < (KERNAL_SIZE*KERNAL_SIZE); idx++) begin
-            next_o_data += mult_out[idx][N+:VALUE_BITS];
+            next_o_data += mult_out[idx][VALUE_Q_FORMAT_N+:VALUE_BITS];
         end
     end
 
