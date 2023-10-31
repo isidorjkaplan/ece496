@@ -41,7 +41,7 @@ module sum #(
         // accumulate only integer portion
         else if(i_ready && i_valid) begin
             for(int i = 0; i < CHANNELS; i++)
-                sum[i] <= sum[i] + (i_data[i] >> (0));
+                sum[i] <= sum[i] + (i_data[i] >> (N));
         end
     end
 

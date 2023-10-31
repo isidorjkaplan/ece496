@@ -118,8 +118,8 @@ module tb();
             while(!i_ready) begin
                 // If DUT claims to not be ready, then it shouldn't be an issue if we 
                 // give it an erroneous value.
-                // i_data[0] = 128;
-                // i_valid = 1'b0;
+                i_data[0] = 128;
+                i_valid = 1'b0;
                 
                 // Wait for a clock period before checking i_ready again
                 #(CLK_PERIOD);
@@ -130,20 +130,20 @@ module tb();
             end
             
             // Test that DUT stalls properly if we don't give it a valid input
-            // if (pixel_id == image_width/4 && !valid_stall_tested) begin
-            //     i_valid = 1'b0;
-            //     i_data[0] = 23; // Strange input to make sure it is ignored.
-            //     #(3*CLK_PERIOD);
+            if (pixel_id == image_width/4 && !valid_stall_tested) begin
+                i_valid = 1'b0;
+                i_data[0] = 23; // Strange input to make sure it is ignored.
+                #(3*CLK_PERIOD);
                 
-            //     // DUT may not be ready at this point, so wait until it is
-            //     while(!i_ready) begin
-            //         #(CLK_PERIOD);
-            //     end
+                // DUT may not be ready at this point, so wait until it is
+                while(!i_ready) begin
+                    #(CLK_PERIOD);
+                end
 
-            //     i_data[0] = saved_i_x;
-            //     i_valid = 1'b1;
-            //     valid_stall_tested = 1;
-            // end
+                i_data[0] = saved_i_x;
+                i_valid = 1'b1;
+                valid_stall_tested = 1;
+            end
             
             // Advance another quarter cycle to next positive edge
             #(QSTEP);

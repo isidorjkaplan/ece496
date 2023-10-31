@@ -2,10 +2,13 @@
 
 
 module de1soc_tb();
-
+    
     parameter VALUES_PER_WORD=1;
     parameter IMG_WIDTH = 28;
     parameter IMG_HEIGHT = IMG_WIDTH;
+
+    // 50 MHz clock
+    localparam CLK_PERIOD = 20; 
 
     logic clk_reset;
 
@@ -32,7 +35,7 @@ module de1soc_tb();
 	// Outputs
 	.out_data(out_data), .out_valid(out_valid), 
 	// Control Flow
-	.out_ready(downstream_stall), .in_ready(upstream_stall));
+	.downstream_stall(downstream_stall), .upstream_stall(upstream_stall));
 
     task automatic send_word(logic [31:0] word);
     begin
@@ -134,7 +137,7 @@ module de1soc_tb();
     end
     endtask
 
-    assign #5 clock = ~clock & !clk_reset;
+    assign #(CLK_PERIOD/2) clock = ~clock & !clk_reset;
     
     initial begin
         wait_cycles(50000);
@@ -164,7 +167,7 @@ module de1soc_tb();
         downstream_stall = 1;
         reset = 1;
         in_valid = 0;
-        #6
+        #((CLK_PERIOD/2) + 1)
         clk_reset = 0;
         @(posedge clock);
         reset = 0;
