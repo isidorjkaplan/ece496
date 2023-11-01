@@ -194,17 +194,19 @@ int main (int argc, char *argv[])
 		printf("Read x=%d, y=%d\n", tmpx, tmpy);
 		fscanf(f, "%d", &tmpmax);
 		printf("Maximum Scaling Value = %d\n", tmpmax);
-
+		assert(tmpx == 28);
+		assert(tmpy == 28);
+		int i = 0;
 		while(!feof(f))
 		{
 			unsigned int word = 0;
 			//cannot do more then 4 bytes at a time
 			fscanf(f, "%d", &word);
-			
-			FIFO_WRITE_BLOCK(word);
+
+			i++;
+			FIFO_WRITE_BLOCK(word | ((i==(tmpx*tmpy))<<30));
 			//printf("Writing word  = %d\n", word);
 		}
-		FIFO_WRITE_BLOCK(1<<30); // DONE flag
 		printf("Wrote %d of %d bytes from file.\n", i, size);
 		fclose(f);
 
