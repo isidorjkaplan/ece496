@@ -192,7 +192,7 @@ void sendToFPGA(char* buf) {
         for (x=0; x < X; x++) {
             unsigned int finish = y==Y-1 && x==X-1;
             finish <<= 30;
-            FIFO_WRITE_BLOCK(((unsigned int)(unsigned char)buf[x + 28*y])<< | finish);
+            FIFO_WRITE_BLOCK(((unsigned int)(unsigned char)buf[x + 28*y]) | finish);
         }
     }
     
