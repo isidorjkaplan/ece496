@@ -36,4 +36,4 @@ for i in range(len(ilist)):
     if (correctpred == index_max):
         num_correct += 1
 
-print("Accuracy: ", num_correct/len(ilist) ,"%")
+print("Accuracy: ", 100*num_correct/len(ilist) ,"%")
