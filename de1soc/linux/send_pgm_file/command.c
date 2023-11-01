@@ -184,14 +184,25 @@ int main (int argc, char *argv[])
 		//tell it how many words we will send
 		//FIFO_WRITE_BLOCK(size);
 		//send the words
+		char buf[100];
+		buf[99] = '\0';
+		fscanf(f, "%s", buf);
+		printf("Read header %s from file\n");
+
+		int tmpx, tmpy, tmpmax;
+		fscanf(f, "%d %d", &tmpx, &tmpy);
+		printf("Read x=%d, y=%d\n", tmpx, tmpy);
+		fscanf(f, "%d", &tmpmax);
+		printf("Maximum Scaling Value = %d\n", tmpmax);
+
 		while(!feof(f))
 		{
 			unsigned int word = 0;
 			//cannot do more then 4 bytes at a time
-	
-			fread(&word, 1, 1,f);
-			FIFO_WRITE_BLOCK((word)&0x3FFFF);
-			//printf("Writing word  =0x%x\n", word);
+			fscanf(f, "%d", &word);
+			
+			FIFO_WRITE_BLOCK(word);
+			//printf("Writing word  = %d\n", word);
 		}
 		FIFO_WRITE_BLOCK(1<<30); // DONE flag
 		printf("Wrote %d of %d bytes from file.\n", i, size);
