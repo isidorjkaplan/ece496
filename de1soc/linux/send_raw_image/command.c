@@ -171,9 +171,8 @@ int main (int argc, char *argv[])
 			for (x = 0; x < X; x++) {
 				// Write pixel data
 				FIFO_WRITE_BLOCK( 
-					((x + y/2 + img_num)&0xFF) 			// Pixel Data
-					| (((y==(Y-1))&0xFF)<<30)	// Last Row flag
-					| ((img_num&0xFF) << 24) 	// Image Tag
+					(((x + y/2 + img_num)<<8)&0x3FFFF) // Pixel Data
+					| (((y==(Y-1) && x == (X-1))&0xFF)<<30)	// Last pixel flag
 				);
 			}
 		}
@@ -186,12 +185,11 @@ int main (int argc, char *argv[])
 				for (ch = 0; ch < RESULT_CHANNELS; ch++) {
 					unsigned int data = FIFO_READ;
 					unsigned int last = (data>>30)&1;
-					unsigned int pixel_value = data&0xFF;
-					unsigned int tag = (data>>24)&((1<<5)-1);
+					unsigned int pixel_value = data&0x3FFFF;
 					//printf("Read (x,y)=(%d,%d), ch=%d, last=%d, tag=%d, value=%d\n", x, y, ch, last, tag, pixel_value);
 					printf("%d, ", pixel_value);
-					assert(tag == img_num);
-					assert(last == (y == RESULT_HEIGHT-1));
+					//assert(tag == img_num);
+					//assert(last == (y == RESULT_HEIGHT-1));
 				}
 				printf("]\n");
 			}

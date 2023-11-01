@@ -1,12 +1,13 @@
 module conv2d #(
-    parameter WIDTH = 28, 
-    parameter KERNAL_SIZE = 3, 
-    parameter VALUE_BITS = 32,
-    parameter N = 16,
-    parameter M = VALUE_BITS - N - 1,
-    parameter OUTPUT_CHANNELS = 1,
-    parameter INPUT_CHANNELS = 1,
-    parameter RELU = 0
+    parameter WIDTH, 
+    parameter KERNAL_SIZE, 
+    parameter VALUE_BITS,
+    parameter VALUE_Q_FORMAT_N,
+    parameter WEIGHTS_Q_FORMAT_N,
+    parameter OUTPUT_CHANNELS,
+    parameter INPUT_CHANNELS,
+    parameter STRIDE,
+    parameter RELU
 ) (
     // general
     input   logic                               clk,                                    // Operating clock
@@ -26,6 +27,8 @@ module conv2d #(
     input   logic                               o_ready,                                // Set to 1 if this block is ready to receive a new pixel
     output  logic                               o_last                                  // Set to 1 if output pixel is last of image
 );
+    localparam OUT_WIDTH = WIDTH - KERNAL_SIZE + 1;
+
     // shared signals
     logic                               i_readys[INPUT_CHANNELS];
     logic                               next_o_valids[INPUT_CHANNELS];
@@ -48,11 +51,11 @@ module conv2d #(
             for(int in_channel = 0; in_channel < INPUT_CHANNELS; in_channel++) begin
                 for(int row = 0; row < KERNAL_SIZE; row++) begin
                     for(int col = 0; col < KERNAL_SIZE; col++) begin
-                        i_weights_per_in[in_channel][out_channel][row][col] = i_weights[out_channel][in_channel][row][col][(16-N)+:VALUE_BITS];
+                        i_weights_per_in[in_channel][out_channel][row][col] = i_weights[out_channel][in_channel][row][col][(WEIGHTS_Q_FORMAT_N-VALUE_Q_FORMAT_N)+:VALUE_BITS];
                     end
                 end                
             end
-            i_bias_per_out[out_channel] = i_bias[out_channel][(16-N)+:VALUE_BITS];
+            i_bias_per_out[out_channel] = i_bias[out_channel][(WEIGHTS_Q_FORMAT_N-VALUE_Q_FORMAT_N)+:VALUE_BITS];
         end
     end
 
@@ -63,8 +66,36 @@ module conv2d #(
 
     // output with ff stuff
     assign o_data = o_data_q;
-    assign o_valid = o_valid_q;
     assign o_last = o_last_q;
+
+    // stride masking of output
+    logic [$clog2(STRIDE-1):0] stride_row_mod_counter;
+    logic [$clog2(STRIDE-1):0] stride_col_mod_counter;
+    logic [$clog2(OUT_WIDTH-1):0] stride_col_counter;
+
+    always_ff@(posedge clk) begin
+        if (reset || (o_last && o_ready)) begin
+            stride_row_mod_counter <= 0;
+            stride_col_mod_counter <= 0;
+            stride_col_counter <= 0;
+        end else if (o_valid_q && o_ready) begin // if the result would actually be latched otherwise don't do anything
+            // Always increment column mod STRIDE, resetting whenever we count STRIDE pixels
+            stride_col_mod_counter <= (stride_col_mod_counter==(STRIDE-1))?0:(stride_col_mod_counter+1);
+            // Always increment column, resetting when we get a full row
+            stride_col_counter <= stride_col_counter + 1;
+            // If we are about to reset the column we increment the row
+            if (stride_col_counter == (OUT_WIDTH-1)) begin
+                // Increment row mod counter, resetting when we hit STRIDE rows
+                stride_row_mod_counter <= (stride_row_mod_counter == (STRIDE-1)) ? 0 : (stride_row_mod_counter+1);
+                // The column resets when the row increments
+                stride_col_counter <= 0;
+                stride_col_mod_counter <= 0;
+            end
+        end
+    end
+    // Mask for stride purposes
+    assign o_valid = o_valid_q && (stride_row_mod_counter == (STRIDE-1) && stride_col_mod_counter == (STRIDE-1));
+  
 
     // calculate output, which is sum between channels and bias
     always_comb begin
@@ -98,8 +129,7 @@ module conv2d #(
             for(int o_ch = 0; o_ch < OUTPUT_CHANNELS; o_ch++)begin
                 o_data_q[o_ch] <= '0;
             end
-        end
-        else if(o_ready) begin
+        end else if(o_ready) begin
             o_valid_q <= next_o_valid;
             o_last_q <= next_o_last;
             o_data_q <= next_o_data;
@@ -114,7 +144,7 @@ module conv2d #(
                 .WIDTH(WIDTH),
                 .KERNAL_SIZE(KERNAL_SIZE),
                 .VALUE_BITS(VALUE_BITS),
-                .N(N),
+                .VALUE_Q_FORMAT_N(VALUE_Q_FORMAT_N),
                 .OUTPUT_CHANNELS(OUTPUT_CHANNELS)
             ) channel(
                 .clk(clk),
@@ -139,11 +169,10 @@ endmodule
 // output valid once everything is generated
 module conv2d_single_in_mult_out #(
     parameter WIDTH, 
-    parameter KERNAL_SIZE = 3, 
-    parameter VALUE_BITS = 32,
-    parameter N = 16,
-    parameter M = VALUE_BITS - N - 1,
-    parameter OUTPUT_CHANNELS = 1
+    parameter KERNAL_SIZE, 
+    parameter VALUE_BITS,
+    parameter VALUE_Q_FORMAT_N,
+    parameter OUTPUT_CHANNELS
 ) (
     // general
     input   logic                               clk,                                    // Operating clock
@@ -187,7 +216,9 @@ module conv2d_single_in_mult_out #(
     logic                               dsp_counter;
 
     assign o_valid = o_valid_q;
-    assign o_last = taps_last_q;
+    // if we do have a valid tap to send, then don't show last until its completed
+    // or else propogate the last signal
+    assign o_last = taps_valid_q ? (taps_last_q && o_valid_q) : (taps_last_q);
     assign o_data = o_data_q;
 
     shift_buffer_array_conv #(
@@ -234,6 +265,10 @@ module conv2d_single_in_mult_out #(
             taps_valid_q <= 0;
             taps_last_q <= 0;
             buffer_ready <= 1;
+        end 
+        // last can propogate even if not valid
+        else if (buffer_ready) begin 
+            taps_last_q <= buffer_last;
         end
     end
 
@@ -293,7 +328,7 @@ module conv2d_single_in_mult_out #(
     always_comb begin
         next_o_data = '0;
         for(int idx = 0; idx < (KERNAL_SIZE*KERNAL_SIZE); idx++) begin
-            next_o_data += mult_out[idx][N+:VALUE_BITS];
+            next_o_data += mult_out[idx][VALUE_Q_FORMAT_N+:VALUE_BITS];
         end
     end
 
@@ -367,8 +402,8 @@ module shift_buffer_array_conv #(
     genvar ram_num;
     generate
         for (ram_num = 0; ram_num < BUFFER_HEIGHT; ram_num++) begin : buffer_rams
-            // Declare duel-port ram with SIMD controls 
-            duel_port_ram #(.VALUE_BITS(VALUE_BITS), .WIDTH(WIDTH)) line_ram(
+            // Declare dual-port ram with SIMD controls 
+            dual_port_ram #(.VALUE_BITS(VALUE_BITS), .WIDTH(WIDTH)) line_ram(
                 .clk(clk), .w_data(i_data), .w_addr(ram_w_addr_q), 
                 // Ram read outputs are stored to a vector, one read address loads one value per row
                 .r_addr(ram_r_addr), .r_data(ram_r_data_q[ram_num]),
@@ -397,7 +432,7 @@ module shift_buffer_array_conv #(
         // Input must be valid, or we are done with the input row
         // Output must be ready to accept 
         // Don't do anything if last tap is on display
-        if ((i_valid || input_done_row_q) && o_ready && !taps_last_q) begin
+        if ((i_valid || input_done_row_q) && o_ready) begin
             
             // Input logic -- Latch as long as we are not done with the input row
             if (!input_done_row_q) begin
@@ -431,7 +466,6 @@ module shift_buffer_array_conv #(
                                 :    (out_row+ram_w_row_select_q-BUFFER_HEIGHT) ]; 
                     // We shift in i_data for the top row as the current value, also mark the tap as last if it is the last data
                     end else begin
-                        next_taps_last = i_last;
                         next_taps[out_row][TAP_WIDTH-1] = i_data;
                     end
                 end
@@ -462,8 +496,13 @@ module shift_buffer_array_conv #(
             end
         end
 
+        // Passing next last asynchronously
+        if (i_last && i_ready) begin
+            next_taps_last = 1;
+        end
+
         // if advertising last tap available then have o_valid high
-        if(taps_last_q) o_valid = 1;
+        //if(taps_last_q) o_valid = 1;
     end
 
     // Synchronous logic. We update the state on the positive edge of the clock
@@ -502,8 +541,8 @@ module shift_buffer_array_conv #(
     end
 endmodule 
 
-// A duel-port ram with word-size of VALUE_BITS, and WIDTH elements
-module duel_port_ram #(
+// A dual-port ram with word-size of VALUE_BITS, and WIDTH elements
+module dual_port_ram #(
     parameter VALUE_BITS, 
     parameter WIDTH
 )(

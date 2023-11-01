@@ -963,14 +963,19 @@ set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
 set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
 set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
 set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
-set_global_assignment -name OPTIMIZATION_MODE BALANCED
+set_global_assignment -name OPTIMIZATION_MODE "AGGRESSIVE AREA"
 
 set_instance_assignment -name FAST_INPUT_REGISTER ON -to *
 set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to *
 set_global_assignment -name TIMING_ANALYZER_MULTICORNER_ANALYSIS ON
-set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 12
 set_global_assignment -name FITTER_EFFORT "AUTO FIT"
 set_global_assignment -name SMART_RECOMPILE OFF
+set_global_assignment -name EDA_SIMULATION_TOOL "ModelSim (Verilog)"
+set_global_assignment -name EDA_TIME_SCALE "1 ps" -section_id eda_simulation
+set_global_assignment -name EDA_OUTPUT_DATA_FORMAT "VERILOG HDL" -section_id eda_simulation
+set_global_assignment -name SYSTEMVERILOG_FILE ../../verilog/maxpool2d.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../verilog/avgpool.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../verilog/model.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../verilog/conv2d.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../verilog/de1soc_top.sv
@@ -978,5 +983,4 @@ set_global_assignment -name SDC_FILE DE1_SoC_Computer.out.sdc
 set_global_assignment -name QIP_FILE Computer_System/synthesis/Computer_System.qip
 set_global_assignment -name VERILOG_FILE hex_decoder.v
 set_global_assignment -name SYSTEMVERILOG_FILE DE1_SoC_Computer.sv
-set_global_assignment -name EDA_SIMULATION_TOOL "ModelSim (Verilog)"
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
