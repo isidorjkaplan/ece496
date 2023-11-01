@@ -65,7 +65,7 @@ endmodule
 
 
 // Takes in a wide internal wire format (such as output of jpeg) and serializes it over multiple cycles
-module serialize #(parameter N, DATA_BITS, DATA_PER_WORD=1, WORD_SIZE=32) (
+module serialize #(parameter N, DATA_BITS, WORD_SIZE=32) (
     input wire clock, 
     input wire reset, //+ve synchronous reset
 
@@ -95,29 +95,20 @@ module serialize #(parameter N, DATA_BITS, DATA_PER_WORD=1, WORD_SIZE=32) (
             buffer_valid <= 1;
         end 
         else if (!downstream_stall && buffer_valid) begin
-            data_idx <= (data_idx + DATA_PER_WORD);
-            if (data_idx+DATA_PER_WORD >= N) begin
+            data_idx <= (data_idx + 1);
+            if (data_idx == N-1) begin
                 data_idx <= 0;
                 buffer_valid <= 0;
             end
         end
     end
 
-    assign out_last = in_last && (data_idx + DATA_PER_WORD >= N);
+    assign out_last = in_last && (data_idx == N-1);
 
     assign upstream_stall = buffer_valid;
     assign out_valid = buffer_valid;
-
-    always_comb begin
-        out_data = 0;
-        for (int data_num = 0; data_num < DATA_PER_WORD; data_num++) begin
-            if (data_idx + data_num < N) begin
-                out_data[ data_num*DATA_BITS +: DATA_BITS ] = unsigned'(data_buffer[data_idx + data_num]);
-            end
-        end
-    end
-    //assign out_data = data_buffer[data_idx];
-
+    assign out_data = unsigned'(data_buffer[data_idx]);
+    
 endmodule
 
 // This just takes a value and registers it
