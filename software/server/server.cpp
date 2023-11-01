@@ -140,7 +140,7 @@ void initFPGABus() {
 	FIFO_read_ptr = (unsigned int *)(h2p_virtual_base + 0x10); //0x10
 
 	// give the FPGA time to finish working
-	usleep(30000);  
+	usleep(3000);  
 	// Flush any initial contents on the Queue
 	int read_count = 0;
 	while (!READ_FIFO_EMPTY) {
@@ -148,14 +148,26 @@ void initFPGABus() {
 		read_count++;
 	}
 
-	printf("Flushed FIFO read queue with %d elements\n", read_count);
+    FIFO_WRITE_BLOCK(1ull << 31);
+	
+    printf("Flushed FIFO read queue with %d elements\n", read_count);
 }
 
+#define VALUE_READ_BITS ((unsigned int)18)
+#define VALUE_MASK ((unsigned int)((1<<VALUE_READ_BITS)-1))
 // Recieve data from FPGA, place into buffer
 void recvFromFPGA(int* buf) {
     int* bstart = buf;
-    while (!READ_FIFO_EMPTY) {
-        *(buf++) = FIFO_READ;
+    int numtoread = 10;
+    while (numtoread > 0) {
+        if (!READ_FIFO_EMPTY) {
+            unsigned int val = FIFO_READ;
+            val &= VALUE_MASK; // mask data bits
+            bool isneg = val&(1<<(VALUE_READ_BITS));
+            val |= isneg ? (0xffffffff & ~VALUE_MASK) : 0;
+            *(buf++) = val;
+            numtoread--;
+        }
     }
     printf("%d words read\n", buf-bstart);
 }
@@ -174,7 +186,9 @@ void sendToFPGA(char* buf) {
     int out_row_count = 0;
     for (y=0; y < Y; y++) {
         for (x=0; x < X; x++) {
-            FIFO_WRITE_BLOCK((int)(unsigned char)buf[x + 28*y]);
+            unsigned int finish = y==Y-1 && x==X-1;
+            finish <<= 30;
+            FIFO_WRITE_BLOCK(((unsigned int)(unsigned char)buf[x + 28*y]) | finish);
         }
     }
     
@@ -353,7 +367,7 @@ int main(int argc, char* argv[]) {
                 // end image processing
                 // begin FPGA I/O
                 sendToFPGA(&pixbuf[0]);
-                pixbuf.resize(28*28);
+                pixbuf.resize(4 * 10);
                 std::cout << "Sent to FPGA" << std::endl;
                 recvFromFPGA((int*)&pixbuf[0]);
                 // end FPGA I/O
