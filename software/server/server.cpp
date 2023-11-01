@@ -140,7 +140,6 @@ void initFPGABus() {
 	FIFO_write_ptr =(unsigned int *)(h2p_virtual_base);
 	FIFO_read_ptr = (unsigned int *)(h2p_virtual_base + 0x10); //0x10
     // Reset the FPGA since server just started
-    FIFO_WRITE_BLOCK(1<<31); //RESET signal
 	// give the FPGA time to finish working
 	usleep(3000);  
 	// Flush any initial contents on the Queue
@@ -162,15 +161,16 @@ void recvFromFPGA(int* buf) {
     int* bstart = buf;
     int numtoread = 10;
     while (numtoread > 0) {
-        if (!READ_FIFO_EMPTY) {
+        //if (!READ_FIFO_EMPTY) {
             unsigned int val = FIFO_READ;
+            printf("R: %d\n", (int)val);
             val &= VALUE_MASK; // mask data bits
-            bool isneg = val&(1<<(VALUE_READ_BITS));
+            bool isneg = val&(1<<(VALUE_READ_BITS-1));
             val |= isneg ? (0xffffffff & ~VALUE_MASK) : 0;
             *(buf++) = val;
             numtoread--;
             printf("%d\n", (int)val);
-        }
+        //}
     }
     printf("%d words read\n", buf-bstart);
 }
@@ -192,7 +192,9 @@ void sendToFPGA(char* buf) {
         for (x=0; x < X; x++) {
             unsigned int finish = y==Y-1 && x==X-1;
             finish <<= 30;
+            printf("F: %d\n", finish);
             FIFO_WRITE_BLOCK(((unsigned int)(unsigned char)buf[x + 28*y]) | finish);
+            printf("E: %x", (((unsigned int)(unsigned char)buf[x + 28*y]) | finish));
         }
     }
     
