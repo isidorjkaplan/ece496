@@ -481,7 +481,7 @@ always @(posedge CLOCK_50) begin
 	// =================================
 	// FPGA_to_HPS state machine
 	//================================== 
-	if (de1soc_out_valid == 1) begin
+	if (de1soc_out_valid == 1 && !fpga_to_hps_in_writedata_valid) begin
 		fpga_to_hps_in_writedata <= de1soc_out_value;
 		fpga_to_hps_in_writedata_valid <= 1;
 	end
