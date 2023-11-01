@@ -11,6 +11,7 @@
 #include <netinet/in.h>
 #include <vector>
 
+#include <iomanip>
 
 #include <jpeglib.h>
 
@@ -168,6 +169,7 @@ void recvFromFPGA(int* buf) {
             val |= isneg ? (0xffffffff & ~VALUE_MASK) : 0;
             *(buf++) = val;
             numtoread--;
+            printf("%d\n", (int)val);
         }
     }
     printf("%d words read\n", buf-bstart);
@@ -190,7 +192,7 @@ void sendToFPGA(char* buf) {
         for (x=0; x < X; x++) {
             unsigned int finish = y==Y-1 && x==X-1;
             finish <<= 30;
-            FIFO_WRITE_BLOCK(((unsigned int)(unsigned char)buf[x + 28*y]) | finish);
+            FIFO_WRITE_BLOCK(((unsigned int)(unsigned char)buf[x + 28*y])<< | finish);
         }
     }
     
@@ -263,7 +265,6 @@ void scaleNN(const std::vector<char>& ipixbuf, const ImgInfo img_info, std::vect
     outbuf.resize(out_info.width * out_info.height * 1);
     
     // TODO: maybe support more than one output channel
-    
     // sample from middle
     int r_offset = img_info.height / out_info.height / 2;
     int c_offset = img_info.width / out_info.width / 2;
@@ -277,8 +278,9 @@ void scaleNN(const std::vector<char>& ipixbuf, const ImgInfo img_info, std::vect
             //std::cout << (int)ipixbuf[img_info.chans*(R * img_info.width + C)] << ' ';
             // todo: luminance
             outbuf[r * out_info.width + c] = ipixbuf[img_info.chans*(R * img_info.width + C)];
+            std::cout << std::setw (4)<< (unsigned int)ipixbuf[img_info.chans*(R * img_info.width + C)] << " ";
         }
-        //std::cout << std::endl;
+        std::cout << std::endl;
     }
 }
 
