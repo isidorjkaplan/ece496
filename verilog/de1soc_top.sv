@@ -30,6 +30,7 @@ module de1soc_top(
     assign soft_reset = reset || in_data[31]; // Can write a word which does a soft-reset
     assign upstream_stall = !model_ready && !soft_reset; // pass model stalling onwards, but also always accept a reset request
 
+    logic upstream_stall_serial;
 
     model #(
         .VALUE_BITS(VALUE_BITS),
@@ -42,7 +43,7 @@ module de1soc_top(
         .reset(soft_reset),
 
         .in_data(to_model),
-        .in_valid(in_valid),
+        .in_valid(in_valid && !soft_reset),
         .in_last(in_data[30] && in_valid),
         .in_ready(model_ready),
 
@@ -52,12 +53,11 @@ module de1soc_top(
         .out_ready(!upstream_stall_serial)
     );
 
-    assign out_data[31] = 0;
     serialize #(.N(OUT_CHANNELS), .DATA_BITS(VALUE_BITS), .WORD_SIZE(29)) ser2par(
         .clock(clock), .reset(soft_reset), 
         .in_data(from_model), .in_valid(model_out_valid),
-        .in_last(model_out_last), .out_last(out_data[30]),
-        .out_data(out_data[29:0]), .out_valid(out_valid),
+        .in_last(model_out_last), .out_last(),
+        .out_data(out_data), .out_valid(out_valid),
         .downstream_stall(downstream_stall), .upstream_stall(upstream_stall_serial)
     );
 
