@@ -102,6 +102,15 @@ double elapsedTime;
 
 #define MIN(x, y) ((x<=y)?x:y)
 
+
+#ifdef DEBUG
+#define PRINTF(...) (printf(__VA_ARGS__))
+#endif
+
+#ifndef DEBUG
+#define PRINTF(...)
+#endif
+
 //
 // END FPGA BUS MACROS & GLOBALS
 //
@@ -109,7 +118,7 @@ double elapsedTime;
 void initFPGABus() {
     if( ( fd = open( "/dev/mem", ( O_RDWR | O_SYNC ) ) ) == -1 )
 	{
-		printf( "ERROR: could not open \"/dev/mem\"...\n" );
+		PRINTF( "ERROR: could not open \"/dev/mem\"...\n" );
 		//return 1;
 	}
 
@@ -119,7 +128,7 @@ void initFPGABus() {
 	// FIFO status registers
 	h2p_lw_virtual_base = mmap( NULL, HW_REGS_SPAN, ( PROT_READ | PROT_WRITE ), MAP_SHARED, fd, HW_REGS_BASE );
 	if( h2p_lw_virtual_base == MAP_FAILED ) {
-		printf( "ERROR: mmap1() failed...\n" );
+		PRINTF( "ERROR: mmap1() failed...\n" );
 		close( fd );
 		//return 1;
 	}
@@ -132,7 +141,7 @@ void initFPGABus() {
 	h2p_virtual_base = mmap( NULL, FIFO_SPAN, ( PROT_READ | PROT_WRITE ), MAP_SHARED, fd, FIFO_BASE);
 
 	if( h2p_virtual_base == MAP_FAILED ) {
-		printf( "ERROR: mmap3() failed...\n" );
+		PRINTF( "ERROR: mmap3() failed...\n" );
 		close( fd );
 		//return(1);
 	}
@@ -151,7 +160,7 @@ void initFPGABus() {
 
     FIFO_WRITE_BLOCK(1ull << 31);
 	
-    printf("Flushed FIFO read queue with %d elements\n", read_count);
+    PRINTF("Flushed FIFO read queue with %d elements\n", read_count);
 }
 
 #define VALUE_READ_BITS ((unsigned int)18)
@@ -162,17 +171,18 @@ void recvFromFPGA(int* buf) {
     int numtoread = 10;
     while (numtoread > 0) {
         //if (!READ_FIFO_EMPTY) {
-            unsigned int val = FIFO_READ;
-            printf("R: %d\n", (int)val);
+            unsigned int val;
+            FIFO_READ_BLOCK(val);
+            PRINTF("R: %d\n", (int)val);
             val &= VALUE_MASK; // mask data bits
             bool isneg = val&(1<<(VALUE_READ_BITS-1));
             val |= isneg ? (0xffffffff & ~VALUE_MASK) : 0;
             *(buf++) = val;
             numtoread--;
-            printf("%d\n", (int)val);
+            PRINTF("%d\n", (int)val);
         //}
     }
-    printf("%d words read\n", buf-bstart);
+    PRINTF("%d words read\n", buf-bstart);
 }
 
 // Send data contained within buf to FPGA
@@ -192,9 +202,9 @@ void sendToFPGA(char* buf) {
         for (x=0; x < X; x++) {
             unsigned int finish = y==Y-1 && x==X-1;
             finish <<= 30;
-            printf("F: %d\n", finish);
+            PRINTF("F: %d\n", finish);
             FIFO_WRITE_BLOCK(((unsigned int)(unsigned char)buf[x + 28*y]) | finish);
-            printf("E: %x", (((unsigned int)(unsigned char)buf[x + 28*y]) | finish));
+            PRINTF("E: %x", (((unsigned int)(unsigned char)buf[x + 28*y]) | finish));
         }
     }
     
@@ -280,9 +290,15 @@ void scaleNN(const std::vector<char>& ipixbuf, const ImgInfo img_info, std::vect
             //std::cout << (int)ipixbuf[img_info.chans*(R * img_info.width + C)] << ' ';
             // todo: luminance
             outbuf[r * out_info.width + c] = ipixbuf[img_info.chans*(R * img_info.width + C)];
+#ifdef DEBUG
             std::cout << std::setw (4)<< (unsigned int)ipixbuf[img_info.chans*(R * img_info.width + C)] << " ";
+#endif
+
+
         }
+#ifdef DEBUG
         std::cout << std::endl;
+#endif
     }
 }
 
@@ -292,10 +308,14 @@ int jpeg_to_neural(const std::vector<char>& img_data, std::vector<char>& nbuf) {
     ImgInfo temp_info;
     int res = decodeJPEG(img_data, temp_buf, temp_info);
     if (res != 0) return 1;
+#ifdef DEBUG
     std::cout << "Decode succesful, about to scale" << std::endl;
+#endif
     ImgInfo neural_info = {28, 28, 1};
     scaleNN(temp_buf, temp_info, nbuf, neural_info);
+#ifdef DEBUG
     std::cout << "Scale succesful" << std::endl;
+#endif
     return 0;
 }
 
@@ -353,7 +373,9 @@ int main(int argc, char* argv[]) {
             if (offset != 4) break; // connection closed gracefully
             img_size = ntohl(img_size);
             offset = 0;
+#ifdef DEBUG
             std::cout << "Recieving image of size " << img_size << std::endl;
+#endif
             img_data.resize(img_size);
             while (img_size) {
                 int amt_to_read = img_size;
@@ -374,12 +396,16 @@ int main(int argc, char* argv[]) {
                 // begin FPGA I/O
                 sendToFPGA(&pixbuf[0]);
                 pixbuf.resize(4 * 10);
+#ifdef DEBUG
                 std::cout << "Sent to FPGA" << std::endl;
+#endif
                 recvFromFPGA((int*)&pixbuf[0]);
                 // end FPGA I/O
                 offset = 0;
                 unsigned int net_size = htonl(pixbuf.size());
+#ifdef DEBUG
                 std::cout << "Sending result of size " << pixbuf.size() << std::endl; 
+#endif
                 while (offset < 4) {
                     res = send(client_sock, (char*)&net_size+offset, 4-offset, 0);
                     if (res == -1) {std::cout << "Error sending msg" << std::endl; return 1;}
@@ -394,7 +420,9 @@ int main(int argc, char* argv[]) {
             }
         }
 
+#ifdef DEBUG
         std::cout << "Succesfully recieved all images" << std::endl;
+#endif
 
         
 
@@ -409,7 +437,9 @@ int main(int argc, char* argv[]) {
             offset += res;
         }
     */
+#ifdef DEBUG
         std::cout << "Succesfully sent data" << std::endl;
+#endif
         close(client_sock);
     }
     std::cout << "Shutting down..." << std::endl;
