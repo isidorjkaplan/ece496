@@ -232,7 +232,7 @@ int decodeJPEG(const std::vector<char>& img_data, std::vector<char>& pixbuf, Img
 
     // bad function name. Doesn't really parse header for data, but will return -1 if jpeg header invalid
     int res = jpeg_read_header(&cinfo, TRUE);
-    if (res == -1) {std::cout << "Error reading jpeg, something wrong with the jpeg file" << std::endl; return 1;}
+    if (res == -1) {std::cerr << "Error reading jpeg, something wrong with the jpeg file" << std::endl; return 1;}
 
     // actually read the header now
     jpeg_start_decompress(&cinfo);
@@ -335,17 +335,17 @@ int main(int argc, char* argv[]) {
                 "6202", // arbitrary port number
                 &hints,
                 &serv_info);
-    if (res != 0 ) {std::cout << "Error getting addr info" << std::endl; return 1;}
+    if (res != 0 ) {std::cerr << "Error getting addr info" << std::endl; return 1;}
 
     // okay, we've got the address. Now make a socket
 
     int sock;
     sock = socket(serv_info->ai_family, serv_info->ai_socktype, serv_info->ai_protocol);
-    if (sock == -1) {std::cout << "Error making socket" << std::endl; return 1;}
+    if (sock == -1) {std::cerr << "Error making socket" << std::endl; return 1;}
     res = bind(sock, serv_info->ai_addr, serv_info->ai_addrlen);
-    if (res == -1) {std::cout << "Error binding to socket" << std::endl; return 1;}
+    if (res == -1) {std::cerr << "Error binding to socket" << std::endl; return 1;}
     res = listen(sock, 5); // support backlog of 5 clients
-    if (res == -1) {std::cout << "Error listening to socket" << std::endl; return 1;}
+    if (res == -1) {std::cerr << "Error listening to socket" << std::endl; return 1;}
 
     // okay, we are listening for TCP connections. Now lets respond to incoming connections
     
@@ -358,7 +358,7 @@ int main(int argc, char* argv[]) {
     std::vector<char> img_data; // ^^
     while (true) {
         client_sock = accept(sock, (sockaddr*)&client_addr, &client_addr_size);
-        if (client_sock == -1) {std::cout << "Error accepting connection" << std::endl; return 1;}
+        if (client_sock == -1) {std::cerr << "Error accepting connection" << std::endl; return 1;}
         // okay, we have accepted 1 connection. Lets recieve some data
      
         while (true) {
@@ -366,7 +366,7 @@ int main(int argc, char* argv[]) {
             int offset = 0;
             while (offset < 4) {
                 res = recv(client_sock, (char*)&img_size+offset, 4-offset, 0);
-                if (res == -1) {std::cout << "Error recieving msg" << std::endl; return 1;}
+                if (res == -1) {std::cerr << "Error recieving msg" << std::endl; return 1;}
                 if (res == 0) break; // connection closed
                 offset += res;
             }
@@ -381,8 +381,8 @@ int main(int argc, char* argv[]) {
                 int amt_to_read = img_size;
                 while (offset < amt_to_read) {
                     res = recv(client_sock, &img_data[offset], amt_to_read - offset, 0);
-                    if (res == -1) {std::cout << "Error recieving msg" << std::endl; return 1;}
-                    if (res == 0) {std::cout << "Error connection closed unexpectedly" << std::endl; return 1;}
+                    if (res == -1) {std::cerr << "Error recieving msg" << std::endl; return 1;}
+                    if (res == 0) {std::cerr << "Error connection closed unexpectedly" << std::endl; return 1;}
                     offset += res;
                 }
                 img_size -= amt_to_read;
@@ -408,13 +408,13 @@ int main(int argc, char* argv[]) {
 #endif
                 while (offset < 4) {
                     res = send(client_sock, (char*)&net_size+offset, 4-offset, 0);
-                    if (res == -1) {std::cout << "Error sending msg" << std::endl; return 1;}
+                    if (res == -1) {std::cerr << "Error sending msg" << std::endl; return 1;}
                     offset +=res;
                 }
                 offset = 0;
                 while (offset < pixbuf.size()) {
                     res = send(client_sock, &pixbuf[offset], pixbuf.size() - offset, 0);
-                    if (res == -1) {std::cout << "Error sending msg" << std::endl; return 1;}
+                    if (res == -1) {std::cerr << "Error sending msg" << std::endl; return 1;}
                     offset += res;
                 }
             }
@@ -433,7 +433,7 @@ int main(int argc, char* argv[]) {
         offset = 0;
         while (offset < 4096) {
             res = send(client_sock, msg+offset, 4096 - offset, 0);
-            if (res == -1) {std::cout << "Error sending msg" << std::endl; return 1;}
+            if (res == -1) {std::cerr << "Error sending msg" << std::endl; return 1;}
             offset += res;
         }
     */
