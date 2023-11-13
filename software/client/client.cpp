@@ -13,6 +13,13 @@
 #include <netinet/in.h>
 
 
+uint64_t get_usec_time() {
+    struct timeval tv;
+    gettimeofday(&tv,NULL);
+    
+    // multiply seconds by 1,000,000 to convert to usec
+    return  (uint64_t)1000000 * tv.tv_sec + tv.tv_usec;
+}
 
 #define MIN(x, y) ((x<=y)?x:y)
 
@@ -46,9 +53,11 @@ int main(int argc, char* argv[]) {
     res = connect(sock, serv_info->ai_addr, serv_info->ai_addrlen);
     if (res == -1) {std::cout << "Error, could not connect to server" << std::endl; return 1;}
 
-    // send each image
-    for (int i = 1; i < argc; ++i) {
 
+
+// send each image
+    for (int i = 1; i < argc; ++i) {
+// send
         int img_fd = open(argv[i], O_RDONLY);
         if (img_fd == -1) {
             std::cout << "File " << argv[1] << " could not be opened" << std::endl;
@@ -59,7 +68,9 @@ int main(int argc, char* argv[]) {
         int32_t img_size = img_stat.st_size; // in bytes, compressed
 
         // first, send size of image:
+#ifdef DEBUG
         std::cout << "Sending image of size " << img_size << std::endl;
+#endif
         int32_t img_size_network = htonl(img_size);
         res = send(sock, (char*)&img_size_network, 4, 0);
         if (res == -1) {std::cout << "Error sending msg" << std::endl; return 1;}
@@ -79,7 +90,12 @@ int main(int argc, char* argv[]) {
             
             img_size -= amt_to_read;
         }
+#ifdef DEBUG
         std::cout << "Sent image succesfully" << std::endl;
+#endif
+        
+// recieve
+
         // recieve image in chunks of 4KiB
         unsigned int results_size;
         int offset = 0;
@@ -90,7 +106,9 @@ int main(int argc, char* argv[]) {
             offset += res;
         }
         results_size = ntohl(results_size);
+#ifdef DEBUG
         std::cout << "Recieving result of size " << results_size << std::endl;
+#endif
         std::string result_file_name = argv[i];
         result_file_name += ".result";
         int res_file = open(result_file_name.c_str(), O_WRONLY | O_CREAT, S_IRWXU);
@@ -113,13 +131,17 @@ int main(int argc, char* argv[]) {
             }
             results_size -= amt_to_read;
         }
+#ifdef DEBUG
         std::cout << "Wrote results to file" << std::endl;
+#endif
         close(res_file);
         close(img_fd);
     }
 
     
+#ifdef DEBUG
     std::cout << "Finished" << std::endl;
+#endif
     
     //int offset = 0;
     //while (offset < 4096) {
