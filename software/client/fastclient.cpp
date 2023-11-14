@@ -38,6 +38,11 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
+#include <vector>
+#include <sys/time.h>
+
+#include <pthread.h>
+
 struct Globals {
     int sock;
     
@@ -57,16 +62,17 @@ uint64_t get_usec_time() {
 
 #define MIN(x, y) ((x<=y)?x:y)
 
-void sendAllImages() {
+void* sendAllImages(void*) {
+    int res;
 // send
-    vector<vector<char>> images;
+    std::vector<std::vector<char>> images(global.argc-1, std::vector<char>{});
 
     // first, pre-load all the images
     for (int i = 1; i < global.argc; ++i) {
         int img_fd = open(global.argv[i], O_RDONLY);
         if (img_fd == -1) {
-            std::cout << "File " << global.argv[i] << " could not be opened" << std::endl;
-            return 1;
+            std::cerr << "File " << global.argv[i] << " could not be opened" << std::endl;
+            return nullptr;
         }
         struct stat img_stat;
         fstat(img_fd, &img_stat);
@@ -76,6 +82,7 @@ void sendAllImages() {
         int32_t offset = 0;
 
         read(img_fd, &images[i-1][0] + offset, img_size); // TODO: check error
+        close(img_fd);
     }
 
 
@@ -86,19 +93,20 @@ void sendAllImages() {
         
         
         res = send(global.sock, (char*)&network_size, 4, 0);
-        if (res == -1) {std::cout << "Error sending msg" << std::endl; return 1;}
+        if (res == -1) {std::cerr << "Error sending msg" << std::endl; return nullptr;}
 
         int offset = 0;
         while (offset < img.size()) {
             res = send(global.sock, &images[i][0]+offset, img.size() - offset, 0);
-            if (res == -1) {std::cout << "Error sending msg" << std::endl; return 1;}
+            if (res == -1) {std::cerr << "Error sending msg" << std::endl; return nullptr;}
             offset += res;
         }
     }
-
+    return NULL;
 }
 
-void recvAllResults() {
+void* recvAllResults(void*) {
+    int res;
     std::vector<std::vector<char>> results;
         
     for (int i = 0; i < global.argc - 1; ++i) {
@@ -106,8 +114,8 @@ void recvAllResults() {
         int offset = 0;
         while (offset < 4) {
             res = recv(global.sock, (char*)&results_size+offset, 4-offset, 0);
-            if (res == -1) {std::cout << "Error recieving msg (size)" << std::endl; return 1;}
-            if (res == 0) {std::cout << "Error connection closed unexpectedly" << std::endl; return 1;} // connection closed
+            if (res == -1) {std::cerr << res << "Error recieving msg (size) "<< res << '-' << errno << std::endl; return nullptr;}
+            if (res == 0) {std::cerr << "Error connection closed unexpectedly" << std::endl; return nullptr;} // connection closed
             offset += res;
         }
         results_size = ntohl(results_size);
@@ -118,13 +126,27 @@ void recvAllResults() {
         offset = 0;
         while (offset < results_size) {
             res = recv(global.sock, (char*)&results[i][0]+offset, results_size - offset, 0);
-            if (res == -1) {std::cout << "Error recieving msg" << std::endl; return 1;}
-            if (res == 0) {std::cout << "Error connection closed unexpectedly" << std::endl; return 1;} // connection closed
+            if (res == -1) {std::cerr << "Error recieving msg" << std::endl; return nullptr;}
+            if (res == 0) {std::cerr << "Error connection closed unexpectedly" << std::endl; return nullptr;} // connection closed
             offset += res;
         }
     }
 
-    // TODO: write results to file
+    
+
+    for (int i = 0; i < global.argc - 1; ++i) {
+        std::string result_file_name = global.argv[i+1];
+        result_file_name += ".result";
+        
+        int res_file = open(result_file_name.c_str(), O_WRONLY | O_CREAT, S_IRWXU);
+
+        if (res_file == -1) {std::cout << "Error opening output file " << errno << std::endl; return nullptr;}
+    
+        res = write(res_file, &results[i][0], results[i].size());
+        if (res == -1) {std::cout << "Error writing to output file" << std::endl; return nullptr;}
+    }
+    return NULL;
+        //close(res_file);
 }
 
 int main(int argc, char* argv[]) {
@@ -132,7 +154,7 @@ int main(int argc, char* argv[]) {
     global.argv = argv;
 
     if (argc < 2) {
-        std::cout << "Useage: client <filenames...>" << std::endl;
+        std::cerr << "Useage: client <filenames...>" << std::endl;
         return 1;
     }
     int res;
@@ -149,39 +171,39 @@ int main(int argc, char* argv[]) {
                 "6202", // arbitrary port number
                 &hints,
                 &serv_info);
-    if (res != 0 ) {std::cout << "Error getting addr info" << std::endl; return 1;}
+    if (res != 0 ) {std::cerr << "Error getting addr info" << std::endl; return 1;}
 
     // okay, we've got the address. Now make a socket
 
     //int sock;
-    sock = socket(serv_info->ai_family, serv_info->ai_socktype, serv_info->ai_protocol);
-    if (sock == -1) {std::cout << "Error making socket" << std::endl; return 1;}
+    global.sock = socket(serv_info->ai_family, serv_info->ai_socktype, serv_info->ai_protocol);
+    if (global.sock == -1) {std::cerr << "Error making socket" << std::endl; return 1;}
 
-    res = connect(sock, serv_info->ai_addr, serv_info->ai_addrlen);
-    if (res == -1) {std::cout << "Error, could not connect to server" << std::endl; return 1;}
-
-    global.sock = sock;
-
-// send each image
-    for (int i = 1; i < argc; ++i) {
-
-        close(res_file);
-        close(img_fd);
-    }
+    res = connect(global.sock, serv_info->ai_addr, serv_info->ai_addrlen);
+    if (res == -1) {std::cerr << "Error, could not connect to server" << std::endl; return 1;}
 
     
-#ifdef DEBUG
+    pthread_t sender, reciever;
+    
+    pthread_create(&sender, NULL, sendAllImages, NULL);
+    pthread_create(&reciever, NULL, recvAllResults, NULL);
+    
+
+    pthread_join(sender, NULL);
+    pthread_join(reciever, NULL);
+
+    
+
     std::cout << "Finished" << std::endl;
-#endif
     
     //int offset = 0;
     //while (offset < 4096) {
     //    res = recv(sock, msg+offset, 4096 - offset, 0);
-    //    if (res == -1) {std::cout << "Error recieving msg" << std::endl; return 1;}
-    //    if (res == 0) {std::cout << "Error connection closed unexpectedly" << std::endl; return 1;}
+    //    if (res == -1) {std::cerr << "Error recieving msg" << std::endl; return 1;}
+    //    if (res == 0) {std::cerr << "Error connection closed unexpectedly" << std::endl; return 1;}
     //    offset += res;
     //}
 
     //std::cout << "Succesfully recieved data" << std::endl;
-    close(sock);
+    close(global.sock);
 }

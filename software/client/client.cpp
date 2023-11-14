@@ -12,6 +12,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
+#include <sys/time.h>
 
 uint64_t get_usec_time() {
     struct timeval tv;
