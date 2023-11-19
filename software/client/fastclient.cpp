@@ -48,6 +48,9 @@ struct Globals {
     
     int argc;
     char** argv;
+
+    uint64_t* startTimes;
+    uint64_t* endTimes;
 };
 
 Globals global;
@@ -66,6 +69,8 @@ void* sendAllImages(void*) {
     int res;
 // send
     std::vector<std::vector<char>> images(global.argc-1, std::vector<char>{});
+
+    global.startTimes = new uint64_t[global.argc - 1];
 
     // first, pre-load all the images
     for (int i = 1; i < global.argc; ++i) {
@@ -90,12 +95,14 @@ void* sendAllImages(void*) {
         auto& img = images[i];
 
         int32_t network_size = htonl(img.size());
-        
-        
-        res = send(global.sock, (char*)&network_size, 4, 0);
-        if (res == -1) {std::cerr << "Error sending msg" << std::endl; return nullptr;}
-
+        global.startTimes[i] = get_usec_time();
         int offset = 0;
+        while (offset < 4) {
+            res = send(global.sock, (char*)&network_size+offset, 4-offset, 0);
+            if (res == -1) {std::cerr << "Error sending msg" << std::endl; return nullptr;}
+            offset += res;
+        }
+        offset = 0;
         while (offset < img.size()) {
             res = send(global.sock, &images[i][0]+offset, img.size() - offset, 0);
             if (res == -1) {std::cerr << "Error sending msg" << std::endl; return nullptr;}
@@ -109,6 +116,7 @@ void* recvAllResults(void*) {
     int res;
     std::vector<std::vector<char>> results;
         
+    global.endTimes = new uint64_t[global.argc - 1];
     for (int i = 0; i < global.argc - 1; ++i) {
         unsigned int results_size;
         int offset = 0;
@@ -130,9 +138,10 @@ void* recvAllResults(void*) {
             if (res == 0) {std::cerr << "Error connection closed unexpectedly" << std::endl; return nullptr;} // connection closed
             offset += res;
         }
+        global.endTimes[i] = get_usec_time();   
     }
 
-    
+    std::cout << "Finished test, writing output files..." << std::endl;
 
     for (int i = 0; i < global.argc - 1; ++i) {
         std::string result_file_name = global.argv[i+1];
@@ -141,10 +150,15 @@ void* recvAllResults(void*) {
         int res_file = open(result_file_name.c_str(), O_WRONLY | O_CREAT, S_IRWXU);
 
         if (res_file == -1) {std::cout << "Error opening output file " << errno << std::endl; return nullptr;}
-    
-        res = write(res_file, &results[i][0], results[i].size());
-        if (res == -1) {std::cout << "Error writing to output file" << std::endl; return nullptr;}
+        int offset = 0;
+        while (offset < results[i].size()) {
+            res = write(res_file, &results[i][0]+offset, results[i].size()-offset);
+            if (res == -1) {std::cout << "Error writing to output file" << std::endl; return nullptr;}
+            offset += res;
+        }
+        close(res_file);
     }
+    std::cout << "Finished writing output files." << std::endl;
     return NULL;
         //close(res_file);
 }
@@ -182,6 +196,7 @@ int main(int argc, char* argv[]) {
     res = connect(global.sock, serv_info->ai_addr, serv_info->ai_addrlen);
     if (res == -1) {std::cerr << "Error, could not connect to server" << std::endl; return 1;}
 
+    std::cout << "Beginning test" << std::endl;
     
     pthread_t sender, reciever;
     
@@ -192,7 +207,22 @@ int main(int argc, char* argv[]) {
     pthread_join(sender, NULL);
     pthread_join(reciever, NULL);
 
-    
+    std::cout << "Beginning latency output" << std::endl;
+
+    const bool doFullLatencyOutput = false;
+
+    uint64_t total_latency = 0;
+    for (int i = 0 ; i < argc - 1; ++i) {
+        if (doFullLatencyOutput)
+            std::cout << "I"<<i<<": " << global.endTimes[i] - global.startTimes[i] << "us" <<std::endl;
+        total_latency += global.endTimes[i] - global.startTimes[i];
+    }
+
+    std::cout << "Quick Stats:" << std::endl;
+    std::cout << "Average Latency: " << total_latency / (argc - 1) <<"us"<< std::endl;
+    std::cout << "Total Runtime of Test: " << global.endTimes[argc-2] - global.startTimes[0] <<"us"<< std::endl;
+    std::cout << "Images Per Second: " << 1000000.0*(argc-1) / (global.endTimes[argc-2] - global.startTimes[0]) << std::endl;
+
 
     std::cout << "Finished" << std::endl;
     
