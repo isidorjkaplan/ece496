@@ -1,6 +1,9 @@
 import os
 import struct
 from PIL import Image
+from time import sleep
+import subprocess
+
 os.system("rm -f ./test_files/*.result")
 
 ilist = os.listdir("./test_files")
@@ -12,11 +15,11 @@ os.system("rm -f ./test_files/*.png")
 
 ilist = os.listdir("./test_files")
 
-cmd = "./a.out"
+totargs = ["./a.out"]
 for f in ilist:
-    cmd += " "
-    cmd += "./test_files/" + f
-os.system(cmd)
+    totargs.append("./test_files/" + f)
+
+subprocess.run(totargs)
 
 guesslist = [];
 
@@ -32,7 +35,7 @@ num_correct = 0
 for i in range(len(ilist)):
     correctpred = int([int(s) for s in ilist[i] if s.isdigit()][-1])
     index_max = max(enumerate(guesslist[i]), key=lambda v: v[1])[0]
-    print(correctpred, index_max);
+    #print(correctpred, index_max);
     if (correctpred == index_max):
         num_correct += 1
 
