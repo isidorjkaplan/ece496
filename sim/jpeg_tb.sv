@@ -4,13 +4,13 @@ module tb();
     localparam QSTEP = CLK_PERIOD/4;                // Time step of a quarter of a clock period
     localparam TIMESTEP = CLK_PERIOD/10;        // Time step of one tenth of a clock period
     localparam PROJECT_DIR = "";
-    localparam TEST_IMAGE = {PROJECT_DIR, "mnist/hw_img_test.jpg"};
+    localparam TEST_IMAGE = {PROJECT_DIR, "/homes/k/kaplani2/ece496/software/client/test_files/file_5_2.jpg"};
 
     logic clk;
     logic reset;
-    logic [31:0] data;
+    logic [7:0] data_byte;
     integer test_image;
-    integer byte_count;
+    integer byte_write_count;
 
 
     // DUT signals
@@ -32,7 +32,8 @@ module tb();
     logic          idle_o;
 
     // reverse endianess
-    assign inport_data_i = {data[7:0], data[15:8], data[23:16], data[31:24]}; 
+    //assign inport_data_i = {data[7:0], data[15:8], data[23:16], data[31:24]}; 
+
 
     // DUT
     jpeg_core dut(
@@ -65,41 +66,85 @@ module tb();
     
     // Producer Process
     initial begin
-        byte_count = 0;
-        outport_accept_i = 1;
+        byte_write_count = 0;
         inport_valid_i = 0;
         inport_last_i = 0;
-        inport_strb_i = 4'b1111;
+        inport_strb_i = 0;//4'b1111;
         reset = 1;
         @(posedge clk);
         @(posedge clk);
         reset = 0;
         //@(posedge clk);
-
+    
         // test image 1
         test_image = $fopen(TEST_IMAGE, "rb");
 
         // Read the image PGM header
-        while(! $feof(test_image)) begin
+        while(!$feof(test_image)) begin
             inport_valid_i = 1;
-            $fread(data, test_image);
-            @(posedge clk);
+            inport_data_i = 0;
+            inport_strb_i = 0;
+            for (int i = 0; i < 4 && !$feof(test_image); i++) begin
+                $fread(inport_data_i[8*i +: 8], test_image);
+                inport_strb_i[i] = 1;
+            end
+            inport_last_i = $feof(test_image);
+            #1;
             while (!inport_accept_o) begin
                 @(posedge clk);
+                #1;
             end
-            byte_count += 1;
+            @(posedge clk);
+            inport_strb_i = 0;
+            byte_write_count += 1;
         end
         inport_last_i = 1;
+        inport_valid_i = 0;
         @(posedge clk);
-
-        $stop();
+        inport_last_i = 0;
+        inport_valid_i = 0;
+        $display("Done writer thread");
     end
 
-    // Consumer process
+    logic[7:0] value[32][32];
+
     initial begin
-        for (int i = 0; i < 100; i++) begin
+        @(negedge reset);
+        // for (int y = 0; y < 28; y++) begin
+        //     for (int x = 0; x < 28; x++) begin
+        //         seen[x][y] = 0;
+        //     end
+        // end
+        
+        outport_accept_i = 1;
+        for (int i = 0; i < 28*28; i++) begin
+            while (!outport_valid_o || !outport_accept_i || outport_pixel_x_o >= 28 || outport_pixel_y_o >= 28) begin
+                @(posedge clk);
+            end
+            $display("Recieved pixel %d at (%d,%d) = (%d,%d,%d)", i, outport_pixel_x_o, outport_pixel_y_o, outport_pixel_r_o, outport_pixel_g_o, outport_pixel_b_o);
+            value[outport_pixel_x_o][outport_pixel_y_o] = outport_pixel_r_o;
+            
+            @(posedge clk);
+        end
+        for (int i = 0; i < 10; i++) begin
+            @(posedge clk);
+        end
+        $display("Consumer thread finished");
+        //$stop();
+    end
+
+    // Timer to stop infinite error
+    initial begin
+        for (int i = 0; i < 5000; i++) begin
             @(posedge clk);
         end 
-        // $stop();
+        $display("Ran out of time -- killing process");
+        for (int y = 0; y < 28; y++) begin
+            for (int x = 0; x < 28; x++) begin
+                $write("%d", value[x][y]>=128);
+            end
+            $display("");
+        end
+        $stop();
     end
 endmodule
