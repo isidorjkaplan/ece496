@@ -16,6 +16,8 @@
 #include <jpeglib.h>
 
 #include <pthread.h>
+#include <semaphore.h>
+
 #include <array>
 #include <queue>
 
@@ -352,27 +354,91 @@ void* transmitForever(void*);
 #define NUM_SIM_CLIENTS 8
 
 
+// SPSC FIFO
+// Not very efficient TBH, but it doesnt really need to be
+class ResultDataQueue {
+    std::queue<std::vector<char>> dataQueue;
+    pthread_mutex_t mutex;
+    sem_t itemsLeft;
+public:
+    ResultDataQueue() {
+        pthread_mutex_init(&mutex, NULL);
+        sem_init(&itemsLeft, 0, 0);
+    }
+    ~ResultDataQueue() {
+        pthread_mutex_destroy(&mutex);
+        sem_destroy(&itemsLeft);
+    }
 
-class ClientDataQueue {
-    std::queue<std:vector<char>> dataQueue;
+    void push(std::vector<char> && in) {
+        pthread_mutex_lock(&mutex);
+        dataQueue.push(std::move(in));
+        pthread_mutex_unlock(&mutex);
+        sem_post(&itemsLeft);
+    }
+
+    // blocks if item cannot be popped
+    std::vector<char> pop() {
+        sem_wait(&itemsLeft);
+        pthread_mutex_lock(&mutex);
+        
+        std::vector<char> ret;
+
+        assert(!dataQueue.empty());
+
+        ret = std::move(dataQueue.front());
+        dataQueue.pop();
+        
+        pthread_mutex_unlock(&mutex);
+        return std::move(ret);
+    }
+
+    void clear() {
+        pthread_mutex_lock(&mutex);
+        while (!dataQueue.empty())
+            dataQueue.pop();
+        
+        sem_destroy(&itemsLeft);
+        sem_init(&itemsLeft, 0, 0);
+        pthread_mutex_unlock(&mutex);
+
+    }
+};
+
+// threadsafe queue for images
+class ImageDataQueue {
+    std::queue<std::vector<char>> dataQueue;
     pthread_mutex_t mutex;
 public:
-    ClientDataQueue() {
-        pthread_mutex_init(mutex);
+    ImageDataQueue() {
+        pthread_mutex_init(&mutex, NULL);
     }
-    void push(std:vector<char> && in) {
+    ~ImageDataQueue() {
+        pthread_mutex_destroy(&mutex);
+    }
+
+    void push(std::vector<char> && in) {
         pthread_mutex_lock(&mutex);
         dataQueue.push(std::move(in));
         pthread_mutex_unlock(&mutex);
     }
-    std::vector<char>& front() {
+
+    // returns empty vector if item cannot be popped
+    std::vector<char> try_pop() {
         pthread_mutex_lock(&mutex);
-        return dataQueue.front();
+        std::vector<char> ret;
+        if (!dataQueue.empty()) {
+            ret = std::move(dataQueue.front());
+            dataQueue.pop();
+        }
         pthread_mutex_unlock(&mutex);
+        return std::move(ret);
     }
-    void pop() {
+    
+    void clear() {
         pthread_mutex_lock(&mutex);
-        dataQueue.pop();
+        while (!dataQueue.empty())
+            dataQueue.pop();
         pthread_mutex_unlock(&mutex);
     }
 };
@@ -386,8 +452,8 @@ struct ClientInfo {
     pthread_t reciever;
     pthread_t sender;
 
-    ClientDataQueue imageQueue; // input image queue
-    ClientDataQueue resultsQueue; // output results queue
+    ImageDataQueue imageQueue; // input image queue
+    ResultDataQueue resultsQueue; // output results queue
 
     ServerInfo* parent; // server that owns this client
 
@@ -396,8 +462,12 @@ struct ClientInfo {
 
 class ServerInfo {
 public:
+    sem_t sema;
+    sem_t deadClients;
+
+
     std::array<ClientInfo, NUM_SIM_CLIENTS> clients;
-    void canMakeClient() {
+    bool canMakeClient() {
         for (ClientInfo& c : clients) {if (!c.valid) return true;}
         return false;
     }
@@ -410,18 +480,27 @@ public:
                 // TODO: maybe clear queues
 
                 // make threads to handle client
-                pthread_attr_t* attr;
-                pthread_attr_init(attr);
+                pthread_attr_t attr;
+                pthread_attr_init(&attr);
                 // set needed attr here
                 
-                pthread_create(&c.sender, attr, transmitForever, (void*)&c);
-                pthread_create(&c.reciever, attr, transmitForever, (void*)&c);
+#ifdef DEBUG
+        std::cout << "Making client threads" << std::endl; 
+#endif
+                pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+                pthread_create(&c.sender, &attr, transmitForever, (void*)&c);
+                pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+                pthread_create(&c.reciever, &attr, recieveForever, (void*)&c);
 
-                pthread_attr_destroy(attr);
+#ifdef DEBUG
+        std::cout << "Made client threads" << std::endl; 
+#endif
+                pthread_attr_destroy(&attr);
 
                 return;
             }
         }
+        std::cout << "PROBLEM" << std::endl;
         // if none, maybe wait on a cv/semaphore
     }
     void destroyClient() {
@@ -432,13 +511,23 @@ public:
         for (ClientInfo& c : clients) {
             c.parent = this;
         }
+        sem_init(&sema, 0, 0);
+        sem_init(&deadClients, 0, NUM_SIM_CLIENTS);
+    }
+    ~ServerInfo() {
+        sem_destroy(&sema);
+        sem_destroy(&deadClients);
     }
 };
+
 
 // Global server info
 ServerInfo serverInfo;
 
 void* listenForever(void*) {
+#ifdef DEBUG
+        std::cout << "Starting listen thread" << std::endl; 
+#endif
     
     int res;
     addrinfo hints;
@@ -454,17 +543,17 @@ void* listenForever(void*) {
                 "6202", // arbitrary port number
                 &hints,
                 &serv_info);
-    if (res != 0 ) {std::cerr << "Error getting addr info" << std::endl; return 1;}
+    if (res != 0 ) {std::cerr << "Error getting addr info" << std::endl; return (void*)1;}
 
     // okay, we've got the address. Now make a socket
 
     int sock;
     sock = socket(serv_info->ai_family, serv_info->ai_socktype, serv_info->ai_protocol);
-    if (sock == -1) {std::cerr << "Error making socket" << std::endl; return 1;}
+    if (sock == -1) {std::cerr << "Error making socket" << std::endl; return (void*)1;}
     res = bind(sock, serv_info->ai_addr, serv_info->ai_addrlen);
-    if (res == -1) {std::cerr << "Error binding to socket" << std::endl; return 1;}
+    if (res == -1) {std::cerr << "Error binding to socket" << std::endl; return (void*)1;}
     res = listen(sock, 5); // support backlog of 5 clients
-    if (res == -1) {std::cerr << "Error listening to socket" << std::endl; return 1;}
+    if (res == -1) {std::cerr << "Error listening to socket" << std::endl; return (void*)1;}
 
     // okay, we are listening for TCP connections. Now lets respond to incoming connections
     
@@ -475,33 +564,75 @@ void* listenForever(void*) {
     int client_sock;
     
     while (true) {
+#ifdef DEBUG
+        std::cout << "Checking for room for a client..." << std::endl; 
+#endif
+        sem_wait(&serverInfo.deadClients);
+#ifdef DEBUG
+        std::cout << "About to listen" << std::endl; 
+#endif
         client_sock = accept(sock, (sockaddr*)&client_addr, &client_addr_size);
-        makeClient(client_sock);
+#ifdef DEBUG
+        std::cout << "Accepting a connection" << std::endl; 
+#endif
+        if (client_sock == -1) {std::cerr << "Error accepting connection" << std::endl; return (void*)1;}
+        serverInfo.makeClient(client_sock);
+#ifdef DEBUG
+        std::cout << "Made a client" << std::endl; 
+#endif
     }
 }
 
 
 void* manageFPGAForever(void*) {
+#ifdef DEBUG
+        std::cout << "Starting manager thread thread" << std::endl; 
+#endif
+
+    initFPGABus();
+
+#ifdef DEBUG
+        std::cout << "Initialized FPGA bus" << std::endl; 
+#endif
     while (true) {
         // decr main semaphore
         // incr main semaphore
-        for (int i = 0; i < NUM_SIM_CLIENTS; ++i) {
-            auto pix_buf = serverInfo.clients[i].imageQueue.try_pop();
-            if (pix_buf.size() != 0) {
-                // decr main semaphore
-                sendToFPGA(&pixbuf[0]);
-                pixbuf.resize(4 * 10);
+        sem_wait(&serverInfo.sema);
+        sem_post(&serverInfo.sema);
+
 #ifdef DEBUG
-                std::cout << "Sent to FPGA" << std::endl;
+        std::cout << "Manager awoken" << std::endl; 
 #endif
-                recvFromFPGA((int*)&pixbuf[0]);
+        for (int i = 0; i < NUM_SIM_CLIENTS; ++i) {
+            std::vector<char> pix_buf = serverInfo.clients[i].imageQueue.try_pop();
+            if (pix_buf.size() != 0) {
+#ifdef DEBUG
+        std::cout << "Manager is sending to FPGA..." << std::endl; 
+#endif
+                sem_wait(&serverInfo.sema);
+                // decr main semaphore
+                sendToFPGA(&pix_buf[0]);
+                pix_buf.resize(4 * 10);
+#ifdef DEBUG
+                std::cout << "Sent to FPGA ... Waiting for response" << std::endl;
+#endif
+                recvFromFPGA((int*)&pix_buf[0]);
+                
+#ifdef DEBUG
+                std::cout << "Recieved from FPGA" << std::endl;
+#endif
+                serverInfo.clients[i].resultsQueue.push(std::move(pix_buf));
             }
         }
     }
 }
 
 void* recieveForever(void* clientInfo_ptr) {
-    
+#ifdef DEBUG
+        std::cout << "Starting reciever thread" << std::endl; 
+#endif
+    int res;
+
     ClientInfo& c = *(ClientInfo*)clientInfo_ptr;
     
     std::vector<char> img_data; // // move outside loop to avoid excessive allocations.
@@ -513,7 +644,7 @@ void* recieveForever(void* clientInfo_ptr) {
         int offset = 0;
         while (offset < 4) {
             res = recv(c.socket, (char*)&img_size+offset, 4-offset, 0);
-            if (res == -1) {std::cerr << "Error recieving msg" << std::endl; return 1;}
+            if (res == -1) {std::cerr << "Error recieving msg" << std::endl; return (void*)1;}
             if (res == 0) break; // connection closed
             offset += res;
         }
@@ -527,9 +658,9 @@ void* recieveForever(void* clientInfo_ptr) {
         while (img_size) {
             int amt_to_read = img_size;
             while (offset < amt_to_read) {
-                res = recv(client_sock, &img_data[offset], amt_to_read - offset, 0);
-                if (res == -1) {std::cerr << "Error recieving msg" << std::endl; return 1;}
-                if (res == 0) {std::cerr << "Error connection closed unexpectedly" << std::endl; return 1;}
+                res = recv(c.socket, &img_data[offset], amt_to_read - offset, 0);
+                if (res == -1) {std::cerr << "Error recieving msg" << std::endl; return (void*)1;}
+                if (res == 0) {std::cerr << "Error connection closed unexpectedly" << std::endl; return (void*)1;}
                 offset += res;
             }
             img_size -= amt_to_read;
@@ -537,81 +668,83 @@ void* recieveForever(void* clientInfo_ptr) {
 
         // process image
         res = jpeg_to_neural(img_data, pixbuf);
-        if (res != 0) {return 1;}
+        if (res != 0) {return (void*)1;}
 
         // queue for access to FPGA
-        c.imageQueue.push(pixbuf);
+        c.imageQueue.push(std::move(pixbuf));
+        sem_post(&serverInfo.sema);
     }
 
     // destroy the client?
+    c.resultsQueue.push({});
+    std::cout << "Reciever quitting gracefully.." << std::endl;
 }
 
 
 void* transmitForever(void* clientInfo_ptr) {
+#ifdef DEBUG
+        std::cout << "Starting transmitter thread" << std::endl; 
+#endif
+    int res;
 
     ClientInfo& c = *(ClientInfo*)clientInfo_ptr;
     while (true) {
-        auto pixbuf = c.resultQueue.pop();
-        // check for sentinel value of {} here
+        auto pixbuf = c.resultsQueue.pop();
+        // if resultsQueue.pop returns empty, then the connection is closed.
+        if (pixbuf.size() == 0) break;
 
-        offset = 0;
+        int offset = 0;
         unsigned int net_size = htonl(pixbuf.size());
 #ifdef DEBUG
         std::cout << "Sending result of size " << pixbuf.size() << std::endl; 
 #endif
         while (offset < 4) {
-            res = send(client_sock, (char*)&net_size+offset, 4-offset, 0);
-            if (res == -1) {std::cerr << "Error sending msg" << std::endl; return 1;}
+            res = send(c.socket, (char*)&net_size+offset, 4-offset, 0);
+            if (res == -1) {std::cerr << "Error sending msg" << std::endl; break; return (void*)1;}
+            if (res == 0) break; // connection closed
             offset +=res;
         }
+        if (offset != 4) break; // connection closed gracefully
         offset = 0;
         while (offset < pixbuf.size()) {
-            res = send(client_sock, &pixbuf[offset], pixbuf.size() - offset, 0);
-            if (res == -1) {std::cerr << "Error sending msg" << std::endl; return 1;}
+            res = send(c.socket, &pixbuf[offset], pixbuf.size() - offset, 0);
+            if (res == -1) {std::cerr << "Error sending msg" << std::endl; return (void*)1;}
+            if (res == 0) {std::cerr << "Error connection closed unexpectedly" << std::endl; return (void*)1;}
             offset += res;
         }
     }
+
+    std::cout << "Transmitter waiting on reciever..." << std::endl;
+    pthread_join(c.reciever, NULL);
+    std::cout << "Transmitter quitting gracefully..." << std::endl;
+    c.imageQueue.clear();
+    c.resultsQueue.clear();
+    close(c.socket);
+    c.socket = -1;
+    c.valid = false;
+    sem_post(&serverInfo.deadClients);
+    return NULL;
 }
 
 // The software server
 int main(int argc, char* argv[]) {
-    while (true) {
-        if (client_sock == -1) {std::cerr << "Error accepting connection" << std::endl; return 1;}
-        // okay, we have accepted 1 connection. Lets recieve some data
-     
-        while (true) {
-            {
-                // begin image processing
-                // end image processing
-                // begin FPGA I/O
-               
-                // end FPGA I/O
-                
-            }
-        }
+   
+    pthread_t manager, listener;
+   std::cout << "Starting Server" <<std::endl;
+    // create the listener and manager threads
+    pthread_create(&manager,  NULL, manageFPGAForever, NULL);
+    pthread_create(&listener, NULL, listenForever, NULL);
+
+
+
+    pthread_join(manager, NULL);
+    pthread_join(listener, NULL);
 
 #ifdef DEBUG
         std::cout << "Succesfully recieved all images" << std::endl;
 #endif
 
         
-
-        // send data to FPGA
-        //  sendToFPGA((int*)&img_data[0], 123456);
-        //  recvFromFPGA((int*)&img_data[0], 123456);
-    /*
-        offset = 0;
-        while (offset < 4096) {
-            res = send(client_sock, msg+offset, 4096 - offset, 0);
-            if (res == -1) {std::cerr << "Error sending msg" << std::endl; return 1;}
-            offset += res;
-        }
-    */
-#ifdef DEBUG
-        std::cout << "Succesfully sent data" << std::endl;
-#endif
-        close(client_sock);
-    }
+        
     std::cout << "Shutting down..." << std::endl;
-    close(sock);
 }

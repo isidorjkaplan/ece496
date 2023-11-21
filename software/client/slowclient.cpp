@@ -42,6 +42,7 @@
 #include <sys/time.h>
 
 #include <pthread.h>
+#include <semaphore.h>
 
 struct Globals {
     int sock;
@@ -51,6 +52,8 @@ struct Globals {
 
     uint64_t* startTimes;
     uint64_t* endTimes;
+
+    sem_t semaphore;
 };
 
 Globals global;
@@ -95,6 +98,7 @@ void* sendAllImages(void*) {
         auto& img = images[i];
 
         int32_t network_size = htonl(img.size());
+        sem_wait(&global.semaphore);
         global.startTimes[i] = get_usec_time();
         int offset = 0;
         while (offset < 4) {
@@ -139,6 +143,7 @@ void* recvAllResults(void*) {
             offset += res;
         }
         global.endTimes[i] = get_usec_time();   
+        sem_post(&global.semaphore);
     }
 
     std::cout << "Finished test, writing output files..." << std::endl;
@@ -199,7 +204,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Beginning test" << std::endl;
     
     pthread_t sender, reciever;
-    
+    sem_init(&global.semaphore, 0, 1);
     pthread_create(&sender, NULL, sendAllImages, NULL);
     pthread_create(&reciever, NULL, recvAllResults, NULL);
     
@@ -207,7 +212,7 @@ int main(int argc, char* argv[]) {
     pthread_join(sender, NULL);
     pthread_join(reciever, NULL);
 
-    //std::cout << "Beginning latency output" << std::endl;
+    std::cout << "Beginning latency output" << std::endl;
 
     const bool doFullLatencyOutput = false;
 
@@ -219,7 +224,7 @@ int main(int argc, char* argv[]) {
     }
 
     std::cout << "Quick Stats:" << std::endl;
-    //std::cout << "Average Latency: " << total_latency / (argc - 1) <<"us"<< std::endl;
+    std::cout << "Average Latency: " <<total_latency / (argc - 1) / 1000 << "ms ("<<total_latency / (argc - 1) <<"us)"<< std::endl;
     std::cout << "Total Runtime of Test: " <<(global.endTimes[argc-2] - global.startTimes[0])/1000000 << "s  ("<<global.endTimes[argc-2] - global.startTimes[0] <<"us)"<< std::endl;
     std::cout << "Images Per Second: " << 1000000.0*(argc-1) / (global.endTimes[argc-2] - global.startTimes[0]) << std::endl;
 
