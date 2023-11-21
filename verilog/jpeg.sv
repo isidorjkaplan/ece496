@@ -10,7 +10,7 @@ module jpeg_decoder #(
     input reset,
     // next row logic
     input   logic        [31 : 0]  in_data,
-    input   logic                  in_last,
+    input   logic                  in_last, // MUST ARRIVE WITH DATA
     input   logic                  in_valid,
     output  logic                  in_ready,
     // output row valid 
@@ -22,8 +22,8 @@ module jpeg_decoder #(
     localparam VALUE_BITS = 8;
     localparam WORD_SIZE = 32;
 
-    logic [$clog2(MAX_JPEG_WORDS-1)-1:0] write_byte_idx;
-    logic [$clog2(MAX_JPEG_WORDS-1)-1:0] read_byte_idx;
+    logic [$clog2(MAX_JPEG_WORDS-1)-1:0] write_byte_idx_q;
+    logic [$clog2(MAX_JPEG_WORDS-1)-1:0] read_byte_addr;
 
     logic [WORD_SIZE-1:0] read_word;
 
@@ -57,12 +57,65 @@ module jpeg_decoder #(
 
     // GLUE 
 
-    always_comb begin
+    // sequential
+    logic [$clog2(MAX_JPEG_WORDS-1)-1:0] max_byte_idx_q;
+    logic [$clog2(MAX_JPEG_WORDS-1)-1:0] read_byte_idx_q;
 
+    // combinational
+    logic [$clog2(MAX_JPEG_WORDS-1)-1:0] next_max_byte_idx;
+    logic [$clog2(MAX_JPEG_WORDS-1)-1:0] next_write_byte_idx;
+    logic [$clog2(MAX_JPEG_WORDS-1)-1:0] next_read_byte_idx;
+
+    always_comb begin
+        next_max_byte_idx = max_byte_idx_q;
+        next_write_byte_idx = write_byte_idx_q;
+        next_read_byte_idx = read_byte_idx_q;
+        read_byte_addr = read_byte_idx_q;
+
+        // INPUT -> BUFFER
+
+        // Either we are not reading anything out of the ram
+        // Or we are reading, but already read the value we will overwrite
+        in_ready = (max_byte_idx_q==0) || (read_byte_idx_q > write_byte_idx_q); 
+        // We latch teh value
+        if (in_valid && in_ready) begin
+            next_write_byte_idx = write_byte_idx_q + 1;
+            if (in_last) begin 
+                next_max_byte_idx = write_byte_idx_q;
+                next_write_byte_idx = 0;
+                read_byte_addr = 0; //so that data is ready on next cycle
+            end
+        end
+
+        // BUFFER -> JPEG
+
+        inport_valid_i = (max_byte_idx_q != 0);
+        inport_strb_i = 4'b1111;
+        inport_last_i = 0;
+
+        inport_data_i = read_word; 
+        // If we are in readout mode and the jpeg decoder accepts the current value
+        if (max_byte_idx_q != 0 && inport_accept_o) begin
+            read_byte_addr = read_byte_idx_q + 1;
+            next_read_byte_idx = read_byte_addr;
+
+            if (read_byte_idx_q == max_byte_idx_q) begin
+                next_max_byte_idx = 0;
+                inport_last_i = 1;
+            end
+        end
     end
 
     always_ff @(posedge clk) begin
-
+        if (reset) begin
+            write_byte_idx_q <= 0;
+            read_byte_idx_q <= 0;
+            max_byte_idx_q <= 0;
+        end else begin
+            write_byte_idx_q <= next_write_byte_idx;
+            read_byte_idx_q <= next_read_byte_idx;
+            max_byte_idx_q <= next_max_byte_idx;
+        end
     end
 
 
@@ -89,6 +142,13 @@ module jpeg_decoder #(
         .idle_o(idle_o)
     );
 
+    // JPEG -> OUT_BUFFER
+
+    always_comb begin
+        outport_accept_i = out_ready;
+        out_data = {outport_pixel_r_o, outport_pixel_g_o, outport_pixel_b_o};
+        out_valid = outport_valid_o && outport_pixel_x_o < WIDTH && outport_pixel_y_o < HEIGHT;
+    end
 
 endmodule
 
