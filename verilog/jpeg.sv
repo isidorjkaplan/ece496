@@ -145,23 +145,46 @@ module jpeg_decoder #(
 
     // JPEG -> OUT_BUFFER
 
+    logic [VALUE_BITS-1:0] result_data[3];
+    logic [$clog2(WIDTH-1)-1:0] result_x;
+    logic [$clog2(HEIGHT-1)-1:0] result_y;
+
+    ram_3d #(.VALUE_BITS(8), .WIDTH(WIDTH), .HEIGHT(HEIGHT), .CHANNELS(3)) out_buffer(
+        .clk(clk), 
+        .w_data({outport_pixel_r_o, outport_pixel_g_o, outport_pixel_b_o}), 
+        .w_addr_x(outport_pixel_x_o[$clog2(WIDTH-1)-1:0]),
+        .w_addr_y(outport_pixel_y_o[$clog2(HEIGHT-1)-1:0]),
+        .w_valid(outport_valid_o),
+        .r_addr_x(result_x),
+        .r_addr_y(result_y),
+        .r_data(result_data)
+    );
+
+    // TODO write logic that streams outputs in row order using ram3d instead of in output order
+
     always_comb begin
         outport_accept_i = out_ready;
         out_data = {outport_pixel_r_o, outport_pixel_g_o, outport_pixel_b_o};
         out_valid = outport_valid_o && outport_pixel_x_o < WIDTH && outport_pixel_y_o < HEIGHT;
     end
 
+
+    always_ff@(posedge clk) begin
+        
+    end
+
 endmodule
 
-module ram_2d #(
+module ram_3d #(
     parameter VALUE_BITS, 
     parameter WIDTH,
-    parameter HEIGHT
+    parameter HEIGHT,
+    parameter CHANNELS
 )(
     input   logic                           clk,
     
     // write interface
-    input   logic [VALUE_BITS-1:0]          w_data,    
+    input   logic [VALUE_BITS-1:0]          w_data[CHANNELS],    
     input   logic [$clog2(WIDTH-1)-1:0]     w_addr_x,
     input   logic [$clog2(HEIGHT-1)-1:0]    w_addr_y,
     input   logic                           w_valid,
@@ -169,23 +192,25 @@ module ram_2d #(
     // read interface
     input   logic [$clog2(WIDTH-1)-1: 0]    r_addr_x,
     input   logic [$clog2(HEIGHT-1)-1: 0]   r_addr_y,
-    output  logic [VALUE_BITS-1:0]          r_data
+    output  logic [VALUE_BITS-1:0]          r_data[CHANNELS]
 );
 
-    logic [VALUE_BITS-1:0] read_vals[HEIGHT];
+    logic [VALUE_BITS-1:0] read_vals[HEIGHT][CHANNELS];
 
-    genvar i;
+    genvar ch, y;
     generate
-        for (i = 0; i < HEIGHT; i++) begin : rams
-            ram_1d #(.VALUE_BITS(VALUE_BITS), .WIDTH(WIDTH)) mod(
-                .clk(clk), 
-                .w_data(w_data),
-                .w_addr(w_addr_x), 
-                .w_valid(w_addr_y == i),
+        for (y = 0; y < HEIGHT; y++) begin : rams_y 
+            for (ch = 0; ch < CHANNELS; ch++) begin : channels 
+                // ram_1d #(.VALUE_BITS(VALUE_BITS), .WIDTH(WIDTH)) mod(
+                //     .clk(clk), 
+                //     .w_data(w_data[ch]),
+                //     .w_addr(w_addr_x), 
+                //     .w_valid(w_addr_y == i),
 
-                .r_addr(r_addr_x),
-                .r_data(read_vals[i])  
-            );
+                //     .r_addr(r_addr_x),
+                //     .r_data(read_vals[i][ch])  
+                // );
+            end
         end
     endgenerate
 
