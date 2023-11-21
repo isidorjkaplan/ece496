@@ -69,7 +69,7 @@ module tb();
         byte_write_count = 0;
         inport_valid_i = 0;
         inport_last_i = 0;
-        inport_strb_i = 0;//4'b1111;
+        inport_strb_i = 4'b1111;
         reset = 1;
         @(posedge clk);
         @(posedge clk);
@@ -83,10 +83,10 @@ module tb();
         while(!$feof(test_image)) begin
             inport_valid_i = 1;
             inport_data_i = 0;
-            inport_strb_i = 0;
+            //inport_strb_i = 0;
             for (int i = 0; i < 4 && !$feof(test_image); i++) begin
                 $fread(inport_data_i[8*i +: 8], test_image);
-                inport_strb_i[i] = 1;
+                //inport_strb_i[i] = 1;
             end
             inport_last_i = $feof(test_image);
             #1;
@@ -95,7 +95,7 @@ module tb();
                 #1;
             end
             @(posedge clk);
-            inport_strb_i = 0;
+            //inport_strb_i = 0;
             byte_write_count += 1;
         end
         inport_last_i = 1;
