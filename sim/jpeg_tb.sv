@@ -7,21 +7,26 @@ module tb();
     localparam TEST_IMAGE = {PROJECT_DIR, "mnist/file_0_5.jpg"};
 
     logic clk;
+    logic [7:0] data;
     integer test_image;
 
 
     // Generate a 50MHz clock
     initial clk = 1'b1;
     always #(CLK_PERIOD/2) clk = ~clk;
-
     
     // Producer Process
     initial begin
         // test image 1
-        test_image = $fopen(TEST_IMAGE, "r");
+        test_image = $fopen(TEST_IMAGE, "rb");
 
         // Read the image PGM header
+        while(! $feof(test_image)) begin
+            $fread(data, test_image);
+            @(posedge clk);
+        end
 
+        $stop();
     end
 
     // Consumer process
@@ -29,6 +34,6 @@ module tb();
         for (int i = 0; i < 100; i++) begin
             @(posedge clk);
         end 
-        $stop();
+        // $stop();
     end
 endmodule
