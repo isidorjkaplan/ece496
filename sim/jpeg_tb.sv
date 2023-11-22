@@ -42,20 +42,26 @@ module tb();
         @(posedge clk);
         reset = 0;
 
-        for (int img_num = 0; img_num < 2; img_num++) begin
+        for (int img_num = 0; img_num < 3; img_num++) begin
             test_image = $fopen(TEST_IMAGE, "rb");
             byte_write_count = 0;
             in_last = 0;
             // Read the image PGM header
             while(!$feof(test_image)) begin
-                in_valid = 1;
+                in_valid = 0;
                 in_data = 0;
                 //inport_strb_i = 0;
                 for (int i = 0; i < 4 && !$feof(test_image); i++) begin
                     $fread(in_data[8*i +: 8], test_image);
                     //inport_strb_i[i] = 1;
                 end
+                // Insert arbitrary delays just to show we can
+                for (int i = 0; i < byte_write_count%4 && byte_write_count < 100; i++) begin
+                    @(posedge clk);
+                end
+
                 in_last = $feof(test_image);
+                in_valid = 1;
                 #1;
                 while (!in_ready) begin
                     @(posedge clk);
@@ -77,10 +83,17 @@ module tb();
     initial begin
         @(negedge reset);   
             for (int img_num = 0; img_num >= 0; img_num++) begin  
-            out_ready = 1;
+
             for (int y = 0; y < 28 && !out_last; y++) begin
                 $write("y=%d: \t", y);
                 for (int x = 0; x < 28 && !out_last; x++) begin
+                    out_ready = 0;
+                    // Arbitrary delay where not ready to read
+                    for (int i = 0; i < x+y*4 % 8; i++) begin
+                        @(posedge clk);
+                    end
+                    // Read
+                    out_ready = 1;
                     #1
                     while (!out_valid || !out_ready ) begin
                         @(posedge clk);
@@ -92,6 +105,7 @@ module tb();
                     $write("%d", out_data[0]>128);
 
                     @(posedge clk);
+                    out_ready = 0;
                 end
                 $write("\n");
             end
@@ -107,7 +121,7 @@ module tb();
 
     // Timer to stop infinite error
     initial begin
-        for (int timer_i = 0; timer_i < 5000; timer_i++) begin
+        for (int timer_i = 0; timer_i < 50*1000; timer_i++) begin
             @(posedge clk);
         end 
         $display("Ran out of time -- killing process");
