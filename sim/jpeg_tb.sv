@@ -4,7 +4,7 @@ module tb();
     localparam QSTEP = CLK_PERIOD/4;                // Time step of a quarter of a clock period
     localparam TIMESTEP = CLK_PERIOD/10;        // Time step of one tenth of a clock period
     localparam PROJECT_DIR = "";
-    localparam TEST_IMAGE = {PROJECT_DIR, "mnist/hw_img_test.jpg"};
+    localparam TEST_IMAGE = {PROJECT_DIR, "../software/client/test_files/file_5_2.jpg"};
 
     logic clk;
     logic reset;
@@ -33,7 +33,6 @@ module tb();
     
     // Producer Process
     initial begin
-        byte_write_count = 0;
         in_valid = 0;
         in_data = 0;
         in_last = 0;
@@ -42,80 +41,76 @@ module tb();
         @(posedge clk);
         @(posedge clk);
         reset = 0;
-        //@(posedge clk);
-    
-        // test image 1
-        test_image = $fopen(TEST_IMAGE, "rb");
 
-        // Read the image PGM header
-        while(!$feof(test_image)) begin
-            in_valid = 1;
-            in_data = 0;
-            //inport_strb_i = 0;
-            for (int i = 0; i < 4 && !$feof(test_image); i++) begin
-                $fread(in_data[8*i +: 8], test_image);
-                //inport_strb_i[i] = 1;
-            end
-            in_last = $feof(test_image);
-            if (in_last) begin
-                $display("Last Byte is %x", in_data);
-            end
-            #1;
-            while (!in_ready) begin
-                @(posedge clk);
+        for (int img_num = 0; img_num < 2; img_num++) begin
+            test_image = $fopen(TEST_IMAGE, "rb");
+            byte_write_count = 0;
+            in_last = 0;
+            // Read the image PGM header
+            while(!$feof(test_image)) begin
+                in_valid = 1;
+                in_data = 0;
+                //inport_strb_i = 0;
+                for (int i = 0; i < 4 && !$feof(test_image); i++) begin
+                    $fread(in_data[8*i +: 8], test_image);
+                    //inport_strb_i[i] = 1;
+                end
+                in_last = $feof(test_image);
                 #1;
+                while (!in_ready) begin
+                    @(posedge clk);
+                    #1;
+                end
+                @(posedge clk);
+                //inport_strb_i = 0;
+                byte_write_count += 1;
             end
-            @(posedge clk);
-            //inport_strb_i = 0;
-            byte_write_count += 1;
-        end
-        in_last = 1;
-        in_valid = 0;
-        @(posedge clk);
-        in_last = 0;
-        in_valid = 0;
-        $display("Done writer thread");
-    end
-
-    //logic[7:0] value[32][32];
-
-    initial begin
-        @(negedge reset);
-        // for (int y = 0; y < 28; y++) begin
-        //     for (int x = 0; x < 28; x++) begin
-        //         seen[x][y] = 0;
-        //     end
-        // end
-     
-        out_ready = 1;
-        for (int i = 0; i < 28*28; i++) begin
-            while (!out_valid || !out_ready ) begin
+            for (int i = 0; i < 1500; i++) begin
                 @(posedge clk);
             end
-            $display("Recieved pixel %d (%d,%d,%d)", i, out_data[2], out_data[1], out_data[0]);
-            //value[outport_pixel_x_o][outport_pixel_y_o] = outport_pixel_r_o;
-         
-            @(posedge clk);
         end
-        for (int i = 0; i < 10; i++) begin
-            @(posedge clk);
-        end
-        $display("Consumer thread finished");
-        //$stop();
+        @(posedge clk);
+
     end
+
+    // Consumer Thread
+    initial begin
+        @(negedge reset);   
+            for (int img_num = 0; img_num >= 0; img_num++) begin  
+            out_ready = 1;
+            for (int y = 0; y < 28 && !out_last; y++) begin
+                $write("y=%d: \t", y);
+                for (int x = 0; x < 28 && !out_last; x++) begin
+                    #1
+                    while (!out_valid || !out_ready ) begin
+                        @(posedge clk);
+                        #1;
+                    end
+                    // $display("Recieved pixel %d (%d,%d,%d)", i, out_data[2], out_data[1], out_data[0]);
+
+                    //$write("%4d", out_data[0]);
+                    $write("%d", out_data[0]>128);
+
+                    @(posedge clk);
+                end
+                $write("\n");
+            end
+            $display("Completed entire img=%d, last=%d", img_num, out_last);
+            @(posedge clk);
+        end
+   
+
+        $display("Consumer thread finished");
+    end
+
+
 
     // Timer to stop infinite error
     initial begin
-        for (int i = 0; i < 5000; i++) begin
+        for (int timer_i = 0; timer_i < 5000; timer_i++) begin
             @(posedge clk);
         end 
         $display("Ran out of time -- killing process");
-        // for (int y = 0; y < 28; y++) begin
-        //     for (int x = 0; x < 28; x++) begin
-        //         $write("%d", value[x][y]>=128);
-        //     end
-        //     $display("");
-        // end
         $stop();
     end
 endmodule

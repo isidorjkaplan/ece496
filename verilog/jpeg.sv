@@ -1,8 +1,8 @@
 // Input is streamed as a jpeg file 
 // Output is streamed in row-major order 
 module jpeg_decoder #(
-    parameter WIDTH = 28,
-    parameter HEIGHT = 28,
+    parameter WIDTH = 28,   // For MNIST
+    parameter HEIGHT = 24,  // HACK: for some reason last 4 rows are just not working properly
     parameter MAX_JPEG_WORDS = 1024
 )(
     // General signals
@@ -74,6 +74,7 @@ module jpeg_decoder #(
 
         // Either we are not reading anything out of the ram
         // Or we are reading, but already read the value we will overwrite
+        // For now we don't allow reading in next image if previous image is still in the pipeline
         in_ready = (max_byte_idx_q==0);// || (read_byte_idx_q > write_byte_idx_q); 
         // We latch teh value
         if (in_valid && in_ready) begin
@@ -87,12 +88,12 @@ module jpeg_decoder #(
 
         // BUFFER -> JPEG
 
-        inport_valid_i = (max_byte_idx_q != 0);
+        inport_valid_i = (max_byte_idx_q != 0);// && (idle_o || (read_byte_idx_q!=0));
         inport_strb_i = 4'b1111;
         inport_last_i = (read_byte_idx_q == max_byte_idx_q) && inport_valid_i;
         inport_data_i = read_word; 
         // If we are in readout mode and the jpeg decoder accepts the current value
-        if (max_byte_idx_q != 0 && inport_accept_o) begin
+        if (inport_valid_i && inport_accept_o) begin
             next_read_byte_idx = read_byte_idx_q + 1;
 
             if (read_byte_idx_q == max_byte_idx_q) begin
@@ -144,10 +145,8 @@ module jpeg_decoder #(
     );
 
     // JPEG -> OUT_BUFFER
-
-    logic [VALUE_BITS-1:0] result_data[3];
-    logic [$clog2(WIDTH-1)-1:0] result_x;
-    logic [$clog2(HEIGHT-1)-1:0] result_y;
+    logic [$clog2(WIDTH-1)-1:0] next_result_x;
+    logic [$clog2(HEIGHT-1)-1:0] next_result_y;
 
     ram_3d #(.VALUE_BITS(8), .WIDTH(WIDTH), .HEIGHT(HEIGHT), .CHANNELS(3)) out_buffer(
         .clk(clk), 
@@ -155,22 +154,92 @@ module jpeg_decoder #(
         .w_addr_x(outport_pixel_x_o[$clog2(WIDTH-1)-1:0]),
         .w_addr_y(outport_pixel_y_o[$clog2(HEIGHT-1)-1:0]),
         .w_valid(outport_valid_o),
-        .r_addr_x(result_x),
-        .r_addr_y(result_y),
-        .r_data(result_data)
+        .r_addr_x(next_result_x),
+        .r_addr_y(next_result_y),
+        .r_data(out_data)
     );
+
+    logic [$clog2(WIDTH)-1:0] row_result_count_q[HEIGHT-1:0]; 
 
     // TODO write logic that streams outputs in row order using ram3d instead of in output order
 
+    logic [$clog2(WIDTH-1)-1:0] result_x_q;
+    logic [$clog2(HEIGHT-1)-1:0] result_y_q;
+
+    logic incr_result_x;
+    logic incr_result_y;
+    logic reset_result_x;
+    logic reset_result_y;
+
     always_comb begin
+        //outport_accept_i = out_ready;
+        //out_data = {outport_pixel_r_o, outport_pixel_g_o, outport_pixel_b_o};
+        //out_valid = outport_valid_o && outport_pixel_x_o < WIDTH && outport_pixel_y_o < HEIGHT;
+
         outport_accept_i = out_ready;
-        out_data = {outport_pixel_r_o, outport_pixel_g_o, outport_pixel_b_o};
-        out_valid = outport_valid_o && outport_pixel_x_o < WIDTH && outport_pixel_y_o < HEIGHT;
+
+        // Increment counters
+        incr_result_x = 0;
+        incr_result_y = 0;
+        // Reset counters -- priority over increment counters
+        reset_result_x = 0;
+        reset_result_y = 0;
+
+        out_last = 0;
+
+        out_valid = row_result_count_q[result_y_q] == WIDTH;
+        if (out_valid && out_ready) begin
+            // Increment or reset X
+            if (result_x_q == WIDTH-1) begin
+                reset_result_x = 1;
+                // Increment or reset Y
+                if (result_y_q == HEIGHT-1) begin
+                    reset_result_y = 1;
+                    out_last = 1;
+                end else begin
+                    incr_result_y = 1;
+                end
+            
+            end else begin
+                incr_result_x = 1;
+            end
+        end
+
+
+        // Handle x
+        if (reset_result_x) next_result_x = 0;
+        else if (incr_result_x) next_result_x = (result_x_q + 1);
+        else next_result_x = result_x_q;
+        
+        // Handle y
+        if (reset_result_y) next_result_y = 0;
+        else if (incr_result_y) next_result_y = (result_y_q + 1);
+        else next_result_y = result_y_q;
+
+            
     end
 
-
     always_ff@(posedge clk) begin
-        
+        if (reset) begin
+            for (int y = 0; y < HEIGHT; y++) begin
+                row_result_count_q[y] <= 0;
+            end
+            result_x_q <= 0;
+            result_y_q <= 0;
+        end else begin // Not in reset
+            // Increment row counter when we get a pixel result
+            if (outport_valid_o && outport_accept_i && outport_pixel_x_o < WIDTH && outport_pixel_y_o < HEIGHT) begin
+                row_result_count_q[outport_pixel_y_o] <= row_result_count_q[outport_pixel_y_o]+1;
+            end
+
+            result_x_q <= next_result_x;
+            result_y_q <= next_result_y;
+
+            // When leaving a row reset its counter
+            if (incr_result_y || reset_result_y) begin
+                row_result_count_q[result_y_q] <= 0;
+            end
+        end
     end
 
 endmodule
@@ -194,27 +263,20 @@ module ram_3d #(
     input   logic [$clog2(HEIGHT-1)-1: 0]   r_addr_y,
     output  logic [VALUE_BITS-1:0]          r_data[CHANNELS]
 );
-
-    logic [VALUE_BITS-1:0] read_vals[HEIGHT][CHANNELS];
-
-    genvar ch, y;
+    genvar ch;
     generate
-        for (y = 0; y < HEIGHT; y++) begin : rams_y 
-            for (ch = 0; ch < CHANNELS; ch++) begin : channels 
-                // ram_1d #(.VALUE_BITS(VALUE_BITS), .WIDTH(WIDTH)) mod(
-                //     .clk(clk), 
-                //     .w_data(w_data[ch]),
-                //     .w_addr(w_addr_x), 
-                //     .w_valid(w_addr_y == i),
+        for (ch = 0; ch < CHANNELS; ch++) begin : rams
+            ram_1d #(.VALUE_BITS(VALUE_BITS), .WIDTH((1<<$clog2(WIDTH))*(1<<$clog2(HEIGHT)))) ram(
+                .clk(clk), 
+                .w_data(w_data[ch]),
+                .w_addr({w_addr_y, w_addr_x}), 
+                .w_valid(w_valid),
 
-                //     .r_addr(r_addr_x),
-                //     .r_data(read_vals[i][ch])  
-                // );
-            end
+                .r_addr({r_addr_y, r_addr_x}),
+                .r_data(r_data[ch])  
+            );
         end
     endgenerate
-
-    assign r_data = read_vals[r_addr_y];
 endmodule 
 
 
