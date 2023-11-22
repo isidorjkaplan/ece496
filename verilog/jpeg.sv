@@ -54,6 +54,9 @@ module jpeg_decoder #(
     logic [  7:0]  outport_pixel_b_o;
     logic          idle_o;
 
+    // This specifies if the JPEG unit is busy. When busy it cannot accept another image
+    logic busy_q;
+
 
     // GLUE 
 
@@ -88,7 +91,7 @@ module jpeg_decoder #(
 
         // BUFFER -> JPEG
 
-        inport_valid_i = (max_byte_idx_q != 0);// && (idle_o || (read_byte_idx_q!=0));
+        inport_valid_i = (max_byte_idx_q != 0) && !busy_q;// && (idle_o || (read_byte_idx_q!=0));
         inport_strb_i = 4'b1111;
         inport_last_i = (read_byte_idx_q == max_byte_idx_q) && inport_valid_i;
         inport_data_i = read_word; 
@@ -240,6 +243,14 @@ module jpeg_decoder #(
                 row_result_count_q[result_y_q] <= 0;
             end
         end
+    end
+    
+    // Logic that is used to keep track of if the module is "busy"
+    // Jpeg decoder is NOT pipelined, must wait until fully done before next image can start
+    always_ff@(posedge clk) begin
+        if (reset) busy_q <= 0;
+        else if (inport_valid_i && inport_last_i && inport_accept_o) busy_q <= 1; 
+        else if (reset_result_y) busy_q <= 0;
     end
 
 endmodule

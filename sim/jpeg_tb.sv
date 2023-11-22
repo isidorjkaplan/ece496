@@ -65,9 +65,9 @@ module tb();
                 //inport_strb_i = 0;
                 byte_write_count += 1;
             end
-            for (int i = 0; i < 1500; i++) begin
-                @(posedge clk);
-            end
+            // for (int i = 0; i < 1500; i++) begin
+            //     @(posedge clk);
+            // end
         end
         @(posedge clk);
 
