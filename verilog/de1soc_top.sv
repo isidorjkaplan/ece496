@@ -75,31 +75,31 @@ module system_top(
     );
 
     // Debugging loop
-    initial begin
-        @(posedge clock);
-        @(negedge reset);
-        @(posedge clock);
-        while (1) begin
-            for (int y = 0; y < WIDTH; y++) begin
-                while (!jpeg_out_valid || !model_ready) begin
-                    @(posedge clock);
-                    #1;
-                end
-                $write("y=%3d: ", y);
-                for (int x = 0; x < WIDTH; x++) begin
-                    #1;
-                    while (!jpeg_out_valid || !model_ready) begin
-                        @(posedge clock);
-                        #1;
-                    end
-                    $write("%1d", jpeg_out[0]>128);
-                    @(posedge clock);
-                    #1;
-                end
-                $write("\n");
-            end
-        end
-    end
+    // initial begin
+    //     @(posedge clock);
+    //     @(negedge reset);
+    //     @(posedge clock);
+    //     while (1) begin
+    //         for (int y = 0; y < WIDTH; y++) begin
+    //             while (!jpeg_out_valid || !model_ready) begin
+    //                 @(posedge clock);
+    //                 #1;
+    //             end
+    //             $write("y=%3d: ", y);
+    //             for (int x = 0; x < WIDTH; x++) begin
+    //                 #1;
+    //                 while (!jpeg_out_valid || !model_ready) begin
+    //                     @(posedge clock);
+    //                     #1;
+    //                 end
+    //                 $write("%1d", jpeg_out[0]>128);
+    //                 @(posedge clock);
+    //                 #1;
+    //             end
+    //             $write("\n");
+    //         end
+    //     end
+    // end
 
     localparam VALUE_BITS=18;
     localparam OUT_CHANNELS=10;
@@ -134,19 +134,19 @@ module system_top(
         .out_ready(!upstream_stall_serial)
     );
 
-    initial begin
-        while(1) begin
-            @(posedge clock);
+    // initial begin
+    //     while(1) begin
+    //         @(posedge clock);
 
-            if (model_out_valid && !upstream_stall_serial) begin
-                $write("Model Classification: ");
-                for (int i = 0; i < OUT_CHANNELS; i++) begin
-                    $write("p(%d)=%d, ", i, from_model[i]);
-                end
-                $write("\n");
-            end
-        end
-    end
+    //         if (model_out_valid && !upstream_stall_serial) begin
+    //             $write("Model Classification: ");
+    //             for (int i = 0; i < OUT_CHANNELS; i++) begin
+    //                 $write("p(%d)=%d, ", i, from_model[i]);
+    //             end
+    //             $write("\n");
+    //         end
+    //     end
+    // end
 
     serialize #(.N(OUT_CHANNELS), .DATA_BITS(VALUE_BITS), .WORD_SIZE(29)) ser2par(
         .clock(clock), .reset(reset), 
