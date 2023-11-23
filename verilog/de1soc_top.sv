@@ -13,6 +13,99 @@ module de1soc_top(
     input wire downstream_stall, 
     output wire upstream_stall
 );
+
+    logic in_ready;
+    assign upstream_stall = !in_ready;
+
+    system_top mod(.clock(clock), .reset(reset), 
+        .in_data(in_data), .in_valid(in_valid),
+        .out_data(out_data), .out_valid(out_valid),
+        .in_ready(in_ready), .out_ready(!downstream_stall)
+    );
+endmodule 
+
+module system_top(
+    input wire clock, 
+    input wire reset, //+ve synchronous reset
+
+    input wire [ 31 : 0 ] in_data,
+    input wire in_valid,
+    output wire in_ready, 
+    
+    output reg [ 31 : 0 ] out_data,
+    output reg out_valid, 
+    input wire out_ready
+);
+
+    logic [7:0] jpeg_out[3];
+    logic jpeg_out_valid;
+    logic jpeg_out_last;
+    logic model_ready;
+
+    jpeg_decoder jpeg(
+        .clk(clock), .reset(reset),
+        .in_data(in_data), .in_valid(in_valid), .in_ready(in_ready),
+        .out_data(jpeg_out), .out_valid(jpeg_out_valid), 
+        .out_last(jpeg_out_last), .out_ready(model_ready)
+    );
+
+    localparam VALUE_BITS=18;
+    localparam OUT_CHANNELS=10;
+    localparam Q_FORMAT_N = 8;
+    
+    logic signed [VALUE_BITS-1:0] to_model[1];
+    logic signed [VALUE_BITS-1:0] from_model[OUT_CHANNELS];
+
+    assign to_model[0] = signed'(jpeg_out[0]<<Q_FORMAT_N);
+
+    logic model_out_valid;
+    logic model_out_last;
+
+    model #(
+        .VALUE_BITS(VALUE_BITS),
+        .VALUE_Q_FORMAT_N(8),
+        .INPUT_WIDTH(28), 
+        .INPUT_CHANNELS(1), 
+        .OUTPUT_CHANNELS(OUT_CHANNELS)
+    )m(
+        .clk(clock),
+        .reset(soft_reset),
+
+        .in_data(to_model),
+        .in_valid(in_valid && !soft_reset),
+        .in_last(jpeg_out_last),
+        .in_ready(model_ready),
+
+        .out_data(from_model),
+        .out_valid(model_out_valid),
+        .out_last(model_out_last),
+        .out_ready(!upstream_stall_serial)
+    );
+
+    serialize #(.N(OUT_CHANNELS), .DATA_BITS(VALUE_BITS), .WORD_SIZE(29)) ser2par(
+        .clock(clock), .reset(soft_reset), 
+        .in_data(from_model), .in_valid(model_out_valid),
+        .in_last(model_out_last), .out_last(),
+        .out_data(out_data), .out_valid(out_valid),
+        .downstream_stall(!out_ready), .upstream_stall(upstream_stall_serial)
+    );
+endmodule 
+
+
+// This is the start of our actual project's DE1SOC adapter
+module de1soc_top_nojpeg(
+    input wire clock, 
+    input wire reset, //+ve synchronous reset
+
+    input wire [ 31 : 0 ] in_data,
+    input wire in_valid,
+    
+    output reg [ 31 : 0 ] out_data,
+    output reg out_valid, 
+
+    input wire downstream_stall, 
+    output wire upstream_stall
+);
     localparam VALUE_BITS=18;
     localparam OUT_CHANNELS=10;
 
