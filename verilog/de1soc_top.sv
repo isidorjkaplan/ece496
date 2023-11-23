@@ -36,15 +36,32 @@ module system_top(
     output reg out_valid, 
     input wire out_ready
 );
+    localparam MAX_JPEG_WORDS = 1024;
+    localparam WIDTH = 28;
+    
+    logic soft_reset;
+    assign soft_reset = reset; //temporary, will add "soft" functionality later
+    logic [$clog2(MAX_JPEG_WORDS+1)-1:0] counter;
+
+    always_ff@(posedge clock) begin
+        if (soft_reset) begin
+            counter <= MAX_JPEG_WORDS;
+        end else if (in_valid && in_ready) begin
+            if (counter == 0) counter <= in_data;
+            else counter <= (counter-1);
+        end
+    end
+
 
     logic [7:0] jpeg_out[3];
     logic jpeg_out_valid;
     logic jpeg_out_last;
     logic model_ready;
 
-    jpeg_decoder jpeg(
-        .clk(clock), .reset(reset),
-        .in_data(in_data), .in_valid(in_valid), .in_ready(in_ready),
+    jpeg_decoder #(.WIDTH(WIDTH), .HEIGHT(WIDTH),.MAX_JPEG_WORDS(MAX_JPEG_WORDS))jpeg(
+        .clk(clock), .reset(soft_reset),
+        .in_data((counter==0)?0:in_data), .in_valid(in_valid || (counter==0)), 
+        .in_ready(in_ready), .in_last(counter==0),
         .out_data(jpeg_out), .out_valid(jpeg_out_valid), 
         .out_last(jpeg_out_last), .out_ready(model_ready)
     );
@@ -72,7 +89,7 @@ module system_top(
         .reset(soft_reset),
 
         .in_data(to_model),
-        .in_valid(in_valid && !soft_reset),
+        .in_valid(jpeg_out_valid),
         .in_last(jpeg_out_last),
         .in_ready(model_ready),
 
