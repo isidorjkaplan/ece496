@@ -31,6 +31,7 @@ module tb();
     
     // Producer Process
     initial begin
+        out_ready = 1;
         in_valid = 0;
         in_data = 0;
         //in_last = 0;
@@ -40,7 +41,7 @@ module tb();
         @(posedge clk);
         reset = 0;
 
-        for (int img_num = 0; img_num < 1; img_num++) begin
+        for (int img_num = 0; img_num < 3; img_num++) begin
             test_image = $fopen(TEST_IMAGE, "rb");
             byte_write_count = 0;
             while(!$feof(test_image)) begin
