@@ -1,8 +1,8 @@
 // Input is streamed as a jpeg file 
 // Output is streamed in row-major order 
 module jpeg_decoder #(
-    parameter WIDTH = 28,   // For MNIST
-    parameter HEIGHT = 24,  // HACK: for some reason last 4 rows are just not working properly
+    parameter WIDTH = 32,   // For MNIST
+    parameter HEIGHT = 32,  // HACK: for some reason last 4 rows are just not working properly
     parameter MAX_JPEG_WORDS = 1024
 )(
     // General signals
@@ -148,26 +148,26 @@ module jpeg_decoder #(
     );
 
     // JPEG -> OUT_BUFFER
-    logic [$clog2(WIDTH-1)-1:0] next_result_x;
-    logic [$clog2(HEIGHT-1)-1:0] next_result_y;
+    logic [$clog2(WIDTH)-1:0] next_result_x;
+    logic [$clog2(HEIGHT)-1:0] next_result_y;
 
     ram_3d #(.VALUE_BITS(8), .WIDTH(WIDTH), .HEIGHT(HEIGHT), .CHANNELS(3)) out_buffer(
         .clk(clk), 
         .w_data({outport_pixel_r_o, outport_pixel_g_o, outport_pixel_b_o}), 
-        .w_addr_x(outport_pixel_x_o[$clog2(WIDTH-1)-1:0]),
-        .w_addr_y(outport_pixel_y_o[$clog2(HEIGHT-1)-1:0]),
+        .w_addr_x(outport_pixel_x_o[$clog2(WIDTH)-1:0]),
+        .w_addr_y(outport_pixel_y_o[$clog2(HEIGHT)-1:0]),
         .w_valid(outport_valid_o),
         .r_addr_x(next_result_x),
         .r_addr_y(next_result_y),
         .r_data(out_data)
     );
 
-    logic [$clog2(WIDTH)-1:0] row_result_count_q[HEIGHT-1:0]; 
+    logic [$clog2(WIDTH+1)-1:0] row_result_count_q[HEIGHT-1:0]; 
 
     // TODO write logic that streams outputs in row order using ram3d instead of in output order
 
-    logic [$clog2(WIDTH-1)-1:0] result_x_q;
-    logic [$clog2(HEIGHT-1)-1:0] result_y_q;
+    logic [$clog2(WIDTH)-1:0] result_x_q;
+    logic [$clog2(HEIGHT)-1:0] result_y_q;
 
     logic incr_result_x;
     logic incr_result_y;
@@ -265,13 +265,13 @@ module ram_3d #(
     
     // write interface
     input   logic [VALUE_BITS-1:0]          w_data[CHANNELS],    
-    input   logic [$clog2(WIDTH-1)-1:0]     w_addr_x,
-    input   logic [$clog2(HEIGHT-1)-1:0]    w_addr_y,
+    input   logic [$clog2(WIDTH)-1:0]     w_addr_x,
+    input   logic [$clog2(HEIGHT)-1:0]    w_addr_y,
     input   logic                           w_valid,
 
     // read interface
-    input   logic [$clog2(WIDTH-1)-1: 0]    r_addr_x,
-    input   logic [$clog2(HEIGHT-1)-1: 0]   r_addr_y,
+    input   logic [$clog2(WIDTH)-1: 0]    r_addr_x,
+    input   logic [$clog2(HEIGHT)-1: 0]   r_addr_y,
     output  logic [VALUE_BITS-1:0]          r_data[CHANNELS]
 );
     genvar ch;
@@ -300,11 +300,11 @@ module ram_1d #(
     
     // write interface
     input   logic [VALUE_BITS-1:0]          w_data,    
-    input   logic [$clog2(WIDTH-1)-1:0]       w_addr,
+    input   logic [$clog2(WIDTH)-1:0]       w_addr,
     input   logic                           w_valid,
 
     // read interface
-    input   logic [$clog2(WIDTH-1)-1: 0]      r_addr,
+    input   logic [$clog2(WIDTH)-1: 0]      r_addr,
     output  logic [VALUE_BITS-1:0]          r_data
 );
     // The actual ram

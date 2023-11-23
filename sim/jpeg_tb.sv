@@ -4,7 +4,7 @@ module tb();
     localparam QSTEP = CLK_PERIOD/4;                // Time step of a quarter of a clock period
     localparam TIMESTEP = CLK_PERIOD/10;        // Time step of one tenth of a clock period
     localparam PROJECT_DIR = "";
-    localparam TEST_IMAGE = {PROJECT_DIR, "../software/client/test_files/file_5_2.jpg"};
+    localparam TEST_IMAGE = {PROJECT_DIR, "/homes/k/kaplani2/ece496/sim/mnist/Tile32.jpg"};
 
     logic clk;
     logic reset;
