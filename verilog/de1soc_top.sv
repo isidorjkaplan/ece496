@@ -45,10 +45,15 @@ module system_top(
 
     always_ff@(posedge clock) begin
         if (soft_reset) begin
-            counter <= MAX_JPEG_WORDS;
+            counter <= 0;
         end else if (in_valid && in_ready) begin
-            if (counter == 0) counter <= in_data;
-            else counter <= (counter-1);
+            if (counter == 0) begin
+                counter <= in_data;
+                $display("de1soc_top.sv: Setting counter to %d", in_data);
+            end else begin
+                counter <= (counter-1);
+                $display("de1soc_top.sv: Reading in word %x with counter=%d", in_data, counter);
+            end
         end
     end
 
@@ -60,7 +65,7 @@ module system_top(
 
     jpeg_decoder #(.WIDTH(WIDTH), .HEIGHT(WIDTH),.MAX_JPEG_WORDS(MAX_JPEG_WORDS))jpeg(
         .clk(clock), .reset(soft_reset),
-        .in_data((counter==0)?0:in_data), .in_valid(in_valid || (counter==0)), 
+        .in_data(in_data), .in_valid(in_valid && (counter!=0)), 
         .in_ready(in_ready), .in_last(counter==0),
         .out_data(jpeg_out), .out_valid(jpeg_out_valid), 
         .out_last(jpeg_out_last), .out_ready(model_ready)

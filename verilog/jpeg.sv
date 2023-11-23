@@ -153,7 +153,7 @@ module jpeg_decoder #(
 
     ram_3d #(.VALUE_BITS(8), .WIDTH(WIDTH), .HEIGHT(HEIGHT), .CHANNELS(3)) out_buffer(
         .clk(clk), 
-        .w_data('{outport_pixel_r_o, outport_pixel_g_o, outport_pixel_b_o}), 
+        .w_data({outport_pixel_r_o, outport_pixel_g_o, outport_pixel_b_o}), 
         .w_addr_x(outport_pixel_x_o[$clog2(WIDTH)-1:0]),
         .w_addr_y(outport_pixel_y_o[$clog2(HEIGHT)-1:0]),
         .w_valid(outport_valid_o),
@@ -251,6 +251,10 @@ module jpeg_decoder #(
         if (reset) busy_q <= 0;
         else if (inport_valid_i && inport_last_i && inport_accept_o) busy_q <= 1; 
         else if (reset_result_y) busy_q <= 0;
+
+        if (in_ready && in_valid) begin
+            $display("jpeg.sv: Got word %x", in_data);
+        end
     end
 
 endmodule
