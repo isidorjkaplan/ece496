@@ -17,5 +17,6 @@ add wave -unsigned dut/jpeg/result_*
 add wave -unsigned dut/jpeg/row_result_count_q
 #add wave -unsigned dut/jpeg/out_buffer/rams[0]/ram/*
 add wave -hex dut/jpeg/out_*
+add wave -hex dut/jpeg/out_data
 
 run -all

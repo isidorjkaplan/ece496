@@ -112,10 +112,10 @@ module jpeg_decoder #(
             read_byte_idx_q <= 0;
             max_byte_idx_q <= 0;
         end else begin
-            if (in_last && in_valid && in_ready)
-                $display("Read last byte from input as %x into %d at t=%d", in_data, write_byte_idx_q, $time());
-            if (inport_valid_i && inport_accept_o)
-                $display("Read into JPEG last=%d byte as %x from %d at t=%d", inport_last_i, inport_data_i, read_byte_idx_q, $time()); 
+            // if (in_last && in_valid && in_ready)
+            //     $display("Read last byte from input as %x into %d at t=%d", in_data, write_byte_idx_q, $time());
+            // if (inport_valid_i && inport_accept_o)
+            //     $display("Read into JPEG last=%d byte as %x from %d at t=%d", inport_last_i, inport_data_i, read_byte_idx_q, $time()); 
 
             write_byte_idx_q <= next_write_byte_idx;
             read_byte_idx_q <= next_read_byte_idx;
@@ -178,8 +178,8 @@ module jpeg_decoder #(
         //outport_accept_i = out_ready;
         //out_data = {outport_pixel_r_o, outport_pixel_g_o, outport_pixel_b_o};
         //out_valid = outport_valid_o && outport_pixel_x_o < WIDTH && outport_pixel_y_o < HEIGHT;
-
-        outport_accept_i = out_ready;
+ 
+        outport_accept_i = 1'b1; // ram is never too busy to accept a pixel
 
         // Increment counters
         incr_result_x = 0;

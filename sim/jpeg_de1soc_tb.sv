@@ -4,7 +4,7 @@ module tb();
     localparam QSTEP = CLK_PERIOD/4;                // Time step of a quarter of a clock period
     localparam TIMESTEP = CLK_PERIOD/10;        // Time step of one tenth of a clock period
     localparam PROJECT_DIR = "";
-    localparam TEST_IMAGE = {PROJECT_DIR, "/homes/k/kaplani2/ece496/sim/mnist/file_0_5.jpg"};
+    localparam TEST_IMAGE = {PROJECT_DIR, "/homes/k/kaplani2/ece496/software/client/test_files/file_4_9.jpg"};
 
     logic clk;
     logic reset;
@@ -47,7 +47,7 @@ module tb();
                 $fread(in_data, test_image);
                 byte_write_count+=1;
             end
-            $display("Writing image of size %d words", byte_write_count);
+            //$display("Writing image of size %d words", byte_write_count);
             in_data = byte_write_count;
             in_valid = 1;
             #1;
