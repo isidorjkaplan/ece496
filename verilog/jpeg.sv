@@ -112,10 +112,10 @@ module jpeg_decoder #(
             read_byte_idx_q <= 0;
             max_byte_idx_q <= 0;
         end else begin
-            // if (in_last && in_valid && in_ready)
-            //     $display("Read last byte from input as %x into %d at t=%d", in_data, write_byte_idx_q, $time());
-            // if (inport_valid_i)
-            //     $display("Read into JPEG last=%d byte as %x from %d at t=%d", inport_last_i, inport_data_i, read_byte_idx_q, $time()); 
+            if (in_last && in_valid && in_ready)
+                $display("Read last byte from input as %x into %d at t=%d", in_data, write_byte_idx_q, $time());
+            if (inport_valid_i && inport_accept_o)
+                $display("Read into JPEG last=%d byte as %x from %d at t=%d", inport_last_i, inport_data_i, read_byte_idx_q, $time()); 
 
             write_byte_idx_q <= next_write_byte_idx;
             read_byte_idx_q <= next_read_byte_idx;
@@ -251,10 +251,6 @@ module jpeg_decoder #(
         if (reset) busy_q <= 0;
         else if (inport_valid_i && inport_last_i && inport_accept_o) busy_q <= 1; 
         else if (reset_result_y) busy_q <= 0;
-
-        if (in_ready && in_valid) begin
-            $display("jpeg.sv: Got word %x", in_data);
-        end
     end
 
 endmodule

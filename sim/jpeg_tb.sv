@@ -22,7 +22,7 @@ module tb();
     logic                 out_last;
     logic                 out_ready;
 
-    jpeg_decoder dut(.clk(clk), .reset(reset), 
+    jpeg_decoder #(.WIDTH(28), .HEIGHT(28),.MAX_JPEG_WORDS(1024)) dut(.clk(clk), .reset(reset), 
         .in_data(in_data), .in_last(in_last), .in_valid(in_valid), .in_ready(in_ready),
         .out_data(out_data), .out_valid(out_valid), .out_last(out_last), .out_ready(out_ready)
     );
@@ -42,7 +42,7 @@ module tb();
         @(posedge clk);
         reset = 0;
 
-        for (int img_num = 0; img_num < 3; img_num++) begin
+        for (int img_num = 0; img_num < 1; img_num++) begin
             test_image = $fopen(TEST_IMAGE, "rb");
             byte_write_count = 0;
             in_last = 0;

@@ -39,22 +39,25 @@ module system_top(
     localparam MAX_JPEG_WORDS = 1024;
     localparam WIDTH = 28;
     
-    logic soft_reset;
-    assign soft_reset = reset; //temporary, will add "soft" functionality later
-    logic [$clog2(MAX_JPEG_WORDS+1)-1:0] counter;
+    logic [$clog2(MAX_JPEG_WORDS+1)-1:0] counter_q;
+    logic send_jpeg_last_q;
 
     always_ff@(posedge clock) begin
-        if (soft_reset) begin
-            counter <= 0;
+        if (reset) begin
+            counter_q <= 0;
+            send_jpeg_last_q <= 0;
         end else if (in_valid && in_ready) begin
-            if (counter == 0) begin
-                counter <= in_data;
-                $display("de1soc_top.sv: Setting counter to %d", in_data);
+            if (counter_q == 0) begin
+                counter_q <= in_data;
+                //$display("de1soc_top.sv: Setting counter to %d", in_data);
             end else begin
-                counter <= (counter-1);
-                $display("de1soc_top.sv: Reading in word %x with counter=%d", in_data, counter);
+                counter_q <= (counter_q-1);
+                send_jpeg_last_q <= (counter_q==1);
+                //$display("de1soc_top.sv: Reading in word %x with counter=%d", in_data, counter_q);
             end
         end
+        // Reset after one cycle 
+        if (send_jpeg_last_q && in_ready) send_jpeg_last_q <= 0;
     end
 
 
@@ -64,9 +67,9 @@ module system_top(
     logic model_ready;
 
     jpeg_decoder #(.WIDTH(WIDTH), .HEIGHT(WIDTH),.MAX_JPEG_WORDS(MAX_JPEG_WORDS))jpeg(
-        .clk(clock), .reset(soft_reset),
-        .in_data(in_data), .in_valid(in_valid && (counter!=0)), 
-        .in_ready(in_ready), .in_last(counter==0),
+        .clk(clock), .reset(reset),
+        .in_data(in_data), .in_valid((in_valid && (counter_q!=0)) || send_jpeg_last_q), 
+        .in_ready(in_ready), .in_last(send_jpeg_last_q),
         .out_data(jpeg_out), .out_valid(jpeg_out_valid), 
         .out_last(jpeg_out_last), .out_ready(model_ready)
     );
@@ -91,7 +94,7 @@ module system_top(
         .OUTPUT_CHANNELS(OUT_CHANNELS)
     )m(
         .clk(clock),
-        .reset(soft_reset),
+        .reset(reset),
 
         .in_data(to_model),
         .in_valid(jpeg_out_valid),
@@ -105,79 +108,13 @@ module system_top(
     );
 
     serialize #(.N(OUT_CHANNELS), .DATA_BITS(VALUE_BITS), .WORD_SIZE(29)) ser2par(
-        .clock(clock), .reset(soft_reset), 
+        .clock(clock), .reset(reset), 
         .in_data(from_model), .in_valid(model_out_valid),
         .in_last(model_out_last), .out_last(),
         .out_data(out_data), .out_valid(out_valid),
         .downstream_stall(!out_ready), .upstream_stall(upstream_stall_serial)
     );
 endmodule 
-
-
-// This is the start of our actual project's DE1SOC adapter
-module de1soc_top_nojpeg(
-    input wire clock, 
-    input wire reset, //+ve synchronous reset
-
-    input wire [ 31 : 0 ] in_data,
-    input wire in_valid,
-    
-    output reg [ 31 : 0 ] out_data,
-    output reg out_valid, 
-
-    input wire downstream_stall, 
-    output wire upstream_stall
-);
-    localparam VALUE_BITS=18;
-    localparam OUT_CHANNELS=10;
-
-    logic signed [VALUE_BITS-1:0] to_model[1];
-    logic signed [VALUE_BITS-1:0] from_model[OUT_CHANNELS];
-    assign to_model[0] = signed'(in_data[VALUE_BITS-1:0]); //truncate away upper bits
-    
-    //TODO update reset to have soft reset coming from in_data
-
-    logic model_ready;
-    logic model_out_valid;
-    logic model_out_last;
-
-    logic soft_reset;
-    assign soft_reset = reset || in_data[31]; // Can write a word which does a soft-reset
-    assign upstream_stall = !model_ready && !soft_reset; // pass model stalling onwards, but also always accept a reset request
-
-    logic upstream_stall_serial;
-
-    model #(
-        .VALUE_BITS(VALUE_BITS),
-        .VALUE_Q_FORMAT_N(8),
-        .INPUT_WIDTH(28), 
-        .INPUT_CHANNELS(1), 
-        .OUTPUT_CHANNELS(OUT_CHANNELS)
-    )m(
-        .clk(clock),
-        .reset(soft_reset),
-
-        .in_data(to_model),
-        .in_valid(in_valid && !soft_reset),
-        .in_last(in_data[30] && in_valid),
-        .in_ready(model_ready),
-
-        .out_data(from_model),
-        .out_valid(model_out_valid),
-        .out_last(model_out_last),
-        .out_ready(!upstream_stall_serial)
-    );
-
-    serialize #(.N(OUT_CHANNELS), .DATA_BITS(VALUE_BITS), .WORD_SIZE(29)) ser2par(
-        .clock(clock), .reset(soft_reset), 
-        .in_data(from_model), .in_valid(model_out_valid),
-        .in_last(model_out_last), .out_last(),
-        .out_data(out_data), .out_valid(out_valid),
-        .downstream_stall(downstream_stall), .upstream_stall(upstream_stall_serial)
-    );
-
-endmodule 
-
 
 // Takes in a wide internal wire format (such as output of jpeg) and serializes it over multiple cycles
 module serialize #(parameter N, DATA_BITS, WORD_SIZE=32) (
