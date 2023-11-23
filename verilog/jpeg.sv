@@ -1,8 +1,8 @@
 // Input is streamed as a jpeg file 
 // Output is streamed in row-major order 
 module jpeg_decoder #(
-    parameter WIDTH = 32,   // For MNIST
-    parameter HEIGHT = 32,  // HACK: for some reason last 4 rows are just not working properly
+    parameter WIDTH = 28,   // For MNIST
+    parameter HEIGHT = 28,  // HACK: for some reason last 4 rows are just not working properly
     parameter MAX_JPEG_WORDS = 1024
 )(
     // General signals

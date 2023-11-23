@@ -4,7 +4,7 @@ module tb();
     localparam QSTEP = CLK_PERIOD/4;                // Time step of a quarter of a clock period
     localparam TIMESTEP = CLK_PERIOD/10;        // Time step of one tenth of a clock period
     localparam PROJECT_DIR = "";
-    localparam TEST_IMAGE = {PROJECT_DIR, "/homes/k/kaplani2/ece496/sim/mnist/Tile32.jpg"};
+    localparam TEST_IMAGE = {PROJECT_DIR, "/homes/k/kaplani2/ece496/sim/mnist/file_0_5.jpg"};
 
     logic clk;
     logic reset;
@@ -60,7 +60,7 @@ module tb();
                     @(posedge clk);
                 end
 
-                in_last = $feof(test_image);
+                in_last = 0;//$feof(test_image);
                 in_valid = 1;
                 #1;
                 while (!in_ready) begin
@@ -71,9 +71,19 @@ module tb();
                 //inport_strb_i = 0;
                 byte_write_count += 1;
             end
-            // for (int i = 0; i < 1500; i++) begin
-            //     @(posedge clk);
-            // end
+
+            in_valid = 1;
+            in_last = 1;
+            #1 ;
+            while (!in_ready) begin
+                @(posedge clk);
+                #1;
+            end
+            @(posedge clk);
+            in_valid = 0;
+            in_last = 0;
+            #1;
+
         end
         @(posedge clk);
 
