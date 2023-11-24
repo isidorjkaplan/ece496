@@ -49,9 +49,7 @@ module jpeg_decoder #(
     logic [ 15:0]  outport_height_o;
     logic [ 15:0]  outport_pixel_x_o;
     logic [ 15:0]  outport_pixel_y_o;
-    logic [  7:0]  outport_pixel_r_o;
-    logic [  7:0]  outport_pixel_g_o;
-    logic [  7:0]  outport_pixel_b_o;
+    logic [  7:0]  outport_pixel_rgb_o[3];
     logic          idle_o;
 
     // This specifies if the JPEG unit is busy. When busy it cannot accept another image
@@ -141,9 +139,9 @@ module jpeg_decoder #(
         .outport_height_o(outport_height_o),
         .outport_pixel_x_o(outport_pixel_x_o),
         .outport_pixel_y_o(outport_pixel_y_o),
-        .outport_pixel_r_o(outport_pixel_r_o),
-        .outport_pixel_g_o(outport_pixel_g_o),
-        .outport_pixel_b_o(outport_pixel_b_o),
+        .outport_pixel_r_o(outport_pixel_rgb_o[0]),
+        .outport_pixel_g_o(outport_pixel_rgb_o[1]),
+        .outport_pixel_b_o(outport_pixel_rgb_o[2]),
         .idle_o(idle_o)
     );
 
@@ -153,7 +151,7 @@ module jpeg_decoder #(
 
     ram_3d #(.VALUE_BITS(8), .WIDTH(WIDTH), .HEIGHT(HEIGHT), .CHANNELS(3)) out_buffer(
         .clk(clk), 
-        .w_data({outport_pixel_r_o, outport_pixel_g_o, outport_pixel_b_o}), 
+        .w_data(outport_pixel_rgb_o), 
         .w_addr_x(outport_pixel_x_o[$clog2(WIDTH)-1:0]),
         .w_addr_y(outport_pixel_y_o[$clog2(HEIGHT)-1:0]),
         .w_valid(outport_valid_o),
