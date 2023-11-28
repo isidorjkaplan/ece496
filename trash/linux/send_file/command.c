@@ -202,7 +202,6 @@ int main (int argc, char *argv[])
 			const int RESULT_HEIGHT = 1;
 			const int RESULT_CHANNELS = 10;
 			int x, y, ch;
-			int img_num = 0;
 			for (y = 0; y < RESULT_HEIGHT; y++) {
 				for (x = 0; x < RESULT_WIDTH; x++) {
 					int ch;
