@@ -173,7 +173,7 @@ module system_top(
     //     end
     // end
 
-    serialize #(.N(OUT_CHANNELS), .DATA_BITS(VALUE_BITS), .WORD_SIZE(29)) ser2par(
+    serialize #(.N(OUT_CHANNELS), .DATA_BITS(VALUE_BITS)) ser2par(
         .clock(clock), .reset(soft_reset), 
         .in_data(from_model), .in_valid(model_out_valid),
         .in_last(model_out_last), .out_last(),
