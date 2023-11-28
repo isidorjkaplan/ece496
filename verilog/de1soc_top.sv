@@ -55,6 +55,7 @@ module system_top(
     // If the counter hits zero it means that we went a super long time without ever recieving an input 
     // or output, that means do a soft reset. Also if hard reset pass that along to the modules
     assign soft_reset = (soft_reset_counter_q==0) || reset;
+    //assign soft_reset = reset; // disable for now
 
     // Jpeg logic
 
