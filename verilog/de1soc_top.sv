@@ -24,9 +24,10 @@ module de1soc_top(
     );
 endmodule 
 
+
 module system_top(
     input wire clock, 
-    input wire reset, //+ve synchronous reset
+    input wire reset, //+ve synchronous soft_reset
 
     input wire [ 31 : 0 ] in_data,
     input wire in_valid,
@@ -36,14 +37,37 @@ module system_top(
     output reg out_valid, 
     input wire out_ready
 );
+    // Automatic reset logic
+
+    localparam SOFT_RESET_BITS=28;    
+    logic soft_reset;
+    logic [SOFT_RESET_BITS-1:0] soft_reset_counter_q;
+    always_ff@(posedge clock) begin
+        // If data goes in or out, or we get a hard reset, than reset soft counter
+        if (   (in_valid && in_ready) || (out_valid && out_ready) || reset ) begin
+            // Initially MAX for the given bit width. That is to say we got data so go back to max time until reset
+            soft_reset_counter_q <= (1<<SOFT_RESET_BITS)-1;
+        end else begin 
+            // Decrement the counter
+            soft_reset_counter_q <= (soft_reset_counter_q - 1);
+        end
+    end
+    // If the counter hits zero it means that we went a super long time without ever recieving an input 
+    // or output, that means do a soft reset. Also if hard reset pass that along to the modules
+    assign soft_reset = (soft_reset_counter_q==0) || reset;
+
+    // Jpeg logic
+
     localparam MAX_JPEG_WORDS = 1024;
     localparam WIDTH = 28;
     
     logic [$clog2(MAX_JPEG_WORDS+1)-1:0] counter_q;
     logic send_jpeg_last_q;
 
+
+
     always_ff@(posedge clock) begin
-        if (reset) begin
+        if (soft_reset) begin
             counter_q <= 0;
             send_jpeg_last_q <= 0;
         end else if (in_valid && in_ready) begin
@@ -56,7 +80,7 @@ module system_top(
                 //$display("de1soc_top.sv: Reading in word %x with counter=%d", in_data, counter_q);
             end
         end
-        // Reset after one cycle 
+        // soft_reset after one cycle 
         if (send_jpeg_last_q && in_ready) send_jpeg_last_q <= 0;
     end
 
@@ -67,7 +91,7 @@ module system_top(
     logic model_ready;
 
     jpeg_decoder #(.WIDTH(WIDTH), .HEIGHT(WIDTH),.MAX_JPEG_WORDS(MAX_JPEG_WORDS))jpeg(
-        .clk(clock), .reset(reset),
+        .clk(clock), .reset(soft_reset),
         .in_data(in_data), .in_valid((in_valid && (counter_q!=0)) || send_jpeg_last_q), 
         .in_ready(in_ready), .in_last(send_jpeg_last_q),
         .out_data(jpeg_out), .out_valid(jpeg_out_valid), 
@@ -77,7 +101,7 @@ module system_top(
     // Debugging loop
     // initial begin
     //     @(posedge clock);
-    //     @(negedge reset);
+    //     @(negedge soft_reset);
     //     @(posedge clock);
     //     while (1) begin
     //         for (int y = 0; y < WIDTH; y++) begin
@@ -121,7 +145,7 @@ module system_top(
         .OUTPUT_CHANNELS(OUT_CHANNELS)
     )m(
         .clk(clock),
-        .reset(reset),
+        .reset(soft_reset),
 
         .in_data(to_model),
         .in_valid(jpeg_out_valid),
@@ -149,13 +173,14 @@ module system_top(
     // end
 
     serialize #(.N(OUT_CHANNELS), .DATA_BITS(VALUE_BITS), .WORD_SIZE(29)) ser2par(
-        .clock(clock), .reset(reset), 
+        .clock(clock), .reset(soft_reset), 
         .in_data(from_model), .in_valid(model_out_valid),
         .in_last(model_out_last), .out_last(),
         .out_data(out_data), .out_valid(out_valid),
         .downstream_stall(!out_ready), .upstream_stall(upstream_stall_serial)
     );
 endmodule 
+
 
 // Takes in a wide internal wire format (such as output of jpeg) and serializes it over multiple cycles
 module serialize #(parameter N, DATA_BITS, WORD_SIZE=32) (
