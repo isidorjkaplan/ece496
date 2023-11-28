@@ -148,16 +148,18 @@ int main (int argc, char *argv[])
 	// give the FPGA time to finish working
 	usleep(30000);  
 	// Flush any initial contents on the Queue
+	int i = 0;
 	while (!READ_FIFO_EMPTY) {
 		FIFO_READ;
+		i++;
 	}
-	printf("Flushed FIFO read queue");
-
+	printf("Flushed FIFO read queue with %d elements\n", i);
+	i = 0;
 
 	//============================================
-	printf("Usage: sudo ./command <file>\n");
+	//printf("Usage: sudo ./command <file>\n");
 
-	int i = 0;
+
 
 	if (argc == 2) {
 		printf("Opening file %s\n", argv[1]);
@@ -172,28 +174,22 @@ int main (int argc, char *argv[])
 		// Get size
 		fseek(f, 0, SEEK_END);
 		size = ftell(f);
-		//assert(size % 4 == 0);
+		size = size/4 + (size%4!=0);
 		rewind(f);
 
 		printf("File is %d words (4 bytes/word)\n", size);
-		
-		FIFO_WRITE_BLOCK(1<<31); // RESET flag
+		FIFO_WRITE_BLOCK(size);
 		i = 0;
-		//reset the device
-		//FIFO_WRITE_BLOCK(0);
-		//tell it how many words we will send
-		//FIFO_WRITE_BLOCK(size);
-		//send the words
 		while(!feof(f))
 		{
 			unsigned int word = 0;
 			//cannot do more then 4 bytes at a time
 	
-			fread(&word, 1, 1,f);
-			FIFO_WRITE_BLOCK((word)&0x3FFFF);
-			//printf("Writing word  =0x%x\n", word);
+			fread(&word, 1, sizeof(word),f);
+			FIFO_WRITE_BLOCK(word);
+			i++;
+			printf("Writing word  =0x%x\n", word);
 		}
-		FIFO_WRITE_BLOCK(1<<30); // DONE flag
 		printf("Wrote %d of %d bytes from file.\n", i, size);
 		fclose(f);
 
@@ -209,10 +205,8 @@ int main (int argc, char *argv[])
 
 				for (ch = 0; ch < RESULT_CHANNELS; ch++) {
 					unsigned int data = FIFO_READ;
-					unsigned int last = (data>>30)&1;
-					unsigned int pixel_value = data&0x3FFFF;
 					//printf("Read (x,y)=(%d,%d), ch=%d, last=%d, tag=%d, value=%d\n", x, y, ch, last, tag, pixel_value);
-					printf("%d, ", pixel_value);
+					printf("%d, ", data);
 					//assert(tag == img_num);
 					//assert(last == (y == RESULT_HEIGHT-1));
 				}
@@ -221,6 +215,14 @@ int main (int argc, char *argv[])
 		}
 		printf("Read %d resulting values\n", RESULT_HEIGHT*RESULT_WIDTH*RESULT_CHANNELS);
 
+		i = 0;
+		while (!READ_FIFO_EMPTY) {
+			FIFO_READ;
+			i++;
+		}
+		printf("Flushed FIFO read queue with %d elements\n", i);
+	} else {
+		printf("Usage: sudo ./command <file>\n");
 	}
 
 
