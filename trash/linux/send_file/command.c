@@ -26,6 +26,7 @@
 #include <unistd.h>
 #include <assert.h>
 
+
 // main bus; scratch RAM
 // used only for testing
 #define FPGA_ONCHIP_BASE      0xC8000000
@@ -159,68 +160,74 @@ int main (int argc, char *argv[])
 	//============================================
 	//printf("Usage: sudo ./command <file>\n");
 
-
-
-	if (argc == 2) {
-		printf("Opening file %s\n", argv[1]);
-		FILE* f = fopen(argv[1], "rb");
-		
-		if (!f) {
-			fprintf(stderr, "Failed to open file: %s\n", argv[1]);
-			exit(1);
-		}
-
-		int size;
-		// Get size
-		fseek(f, 0, SEEK_END);
-		size = ftell(f);
-		size = size/4 + (size%4!=0);
-		rewind(f);
-
-		printf("File is %d words (4 bytes/word)\n", size);
-		FIFO_WRITE_BLOCK(size);
-		i = 0;
-		while(!feof(f))
-		{
-			unsigned int word = 0;
-			//cannot do more then 4 bytes at a time
 	
-			fread(&word, 1, sizeof(word),f);
-			FIFO_WRITE_BLOCK(word);
-			i++;
-			printf("Writing word  =0x%x\n", word);
-		}
-		printf("Wrote %d of %d bytes from file.\n", i, size);
-		fclose(f);
+	int img_count = 1;
 
-		const int RESULT_WIDTH = 1;
-		const int RESULT_HEIGHT = 1;
-		const int RESULT_CHANNELS = 10;
-		int x, y, ch;
-		int img_num = 0;
-		for (y = 0; y < RESULT_HEIGHT; y++) {
-			for (x = 0; x < RESULT_WIDTH; x++) {
-				int ch;
-				printf("Read (x,y)=(%d,%d) from img=%d is [", x, y, img_num);
+	if (argc >= 2) {
+		if (argc >= 3) img_count = atoi(argv[2]);
 
-				for (ch = 0; ch < RESULT_CHANNELS; ch++) {
-					unsigned int data = FIFO_READ;
-					//printf("Read (x,y)=(%d,%d), ch=%d, last=%d, tag=%d, value=%d\n", x, y, ch, last, tag, pixel_value);
-					printf("%d, ", data);
-					//assert(tag == img_num);
-					//assert(last == (y == RESULT_HEIGHT-1));
-				}
-				printf("]\n");
+		int img_num;
+		for (img_num = 0; img_num < img_count; img_num++) {
+			int size;
+			// Get size
+			printf("Opening file %s\n", argv[1]);
+			FILE* f = fopen(argv[1], "rb");
+			
+			if (!f) {
+				fprintf(stderr, "Failed to open file: %s\n", argv[1]);
+				exit(1);
 			}
-		}
-		printf("Read %d resulting values\n", RESULT_HEIGHT*RESULT_WIDTH*RESULT_CHANNELS);
+			fseek(f, 0, SEEK_END);
+			size = ftell(f);
+			size = size/4 + (size%4!=0);
+			rewind(f);
 
-		i = 0;
-		while (!READ_FIFO_EMPTY) {
-			FIFO_READ;
-			i++;
+			printf("File is %d words (4 bytes/word)\n", size);
+			FIFO_WRITE_BLOCK(size);
+			i = 0;
+			while(!feof(f))
+			{
+				unsigned int word = 0;
+				//cannot do more then 4 bytes at a time
+		
+				fread(&word, 1, sizeof(word),f);
+				FIFO_WRITE_BLOCK(word);
+				i++;
+				//printf("Writing word  =0x%x\n", word);
+			}
+			printf("Wrote %d of %d bytes from file.\n", i, size);
+			fclose(f);
+
+			const int RESULT_WIDTH = 1;
+			const int RESULT_HEIGHT = 1;
+			const int RESULT_CHANNELS = 10;
+			int x, y, ch;
+			int img_num = 0;
+			for (y = 0; y < RESULT_HEIGHT; y++) {
+				for (x = 0; x < RESULT_WIDTH; x++) {
+					int ch;
+					printf("Read (x,y)=(%d,%d) from img=%d is [", x, y, img_num);
+
+					for (ch = 0; ch < RESULT_CHANNELS; ch++) {
+						unsigned int data = FIFO_READ;
+						//printf("Read (x,y)=(%d,%d), ch=%d, last=%d, tag=%d, value=%d\n", x, y, ch, last, tag, pixel_value);
+						printf("%d, ", data);
+						//assert(tag == img_num);
+						//assert(last == (y == RESULT_HEIGHT-1));
+					}
+					printf("]\n");
+				}
+			}
+			//printf("Read %d resulting values\n", RESULT_HEIGHT*RESULT_WIDTH*RESULT_CHANNELS);
+			
+
+			i = 0;
+			while (!READ_FIFO_EMPTY) {
+				FIFO_READ;
+				i++;
+			}
+			printf("Flushed FIFO read queue with %d elements\n", i);
 		}
-		printf("Flushed FIFO read queue with %d elements\n", i);
 	} else {
 		printf("Usage: sudo ./command <file>\n");
 	}
