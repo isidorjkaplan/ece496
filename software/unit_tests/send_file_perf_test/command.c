@@ -109,6 +109,29 @@ void read_next() {
 	print_data(FIFO_READ);
 }
 
+void assert_fifo_empty(const char* tag) {
+	//usleep(100);  
+
+	int i = 0;
+	while (!READ_FIFO_EMPTY) {
+		FIFO_READ;
+		
+		i++;
+	}
+	
+	if (i > 0) {
+		printf("ERROR (tag=%s): Flushed FIFO read queue with %d elements when expecting no elements\n", tag, i);
+		exit(1);
+	}
+}
+
+long long timeInMilliseconds(void) {
+    struct timeval tv;
+
+    gettimeofday(&tv,NULL);
+    return (((long long)tv.tv_sec)*1000)+(tv.tv_usec/1000);
+}
+
 int main (int argc, char *argv[])
 {	
 	// === get FPGA addresses ==================
@@ -160,75 +183,107 @@ int main (int argc, char *argv[])
 	//============================================
 	//printf("Usage: sudo ./command <file>\n");
 
-	
-	int img_count = 1;
 
-	if (argc >= 2) {
-		if (argc >= 3) img_count = atoi(argv[2]);
+	if (argc == 4) {
+		int img_count = atoi(argv[2]);
+		int max_in_flight = atoi(argv[3]);
 
-		int img_num;
-		for (img_num = 0; img_num < img_count; img_num++) {
-			int size;
-			// Get size
-			printf("Opening file %s\n", argv[1]);
-			FILE* f = fopen(argv[1], "rb");
-			
-			if (!f) {
-				fprintf(stderr, "Failed to open file: %s\n", argv[1]);
-				exit(1);
-			}
-			fseek(f, 0, SEEK_END);
-			size = ftell(f);
-			size = size/4 + (size%4!=0);
-			rewind(f);
+		// PRELOAD EVERYTHING INTO MEMORY TO MAKE AS FAST AS POSSIBLE
 
-			printf("File is %d words (4 bytes/word)\n", size);
-			FIFO_WRITE_BLOCK(size);
-			i = 0;
-			while(!feof(f))
-			{
-				unsigned int word = 0;
-				//cannot do more then 4 bytes at a time
+		int size;
+		// Get size
+		printf("Opening file %s\n", argv[1]);
+		FILE* f = fopen(argv[1], "rb");
 		
-				fread(&word, 1, sizeof(word),f);
-				FIFO_WRITE_BLOCK(word);
-				i++;
-				//printf("Writing word  =0x%x\n", word);
-			}
-			printf("Wrote %d of %d bytes from file.\n", i, size);
-			fclose(f);
-
-			const int RESULT_WIDTH = 1;
-			const int RESULT_HEIGHT = 1;
-			const int RESULT_CHANNELS = 10;
-			int x, y, ch;
-			for (y = 0; y < RESULT_HEIGHT; y++) {
-				for (x = 0; x < RESULT_WIDTH; x++) {
-					int ch;
-					printf("Read (x,y)=(%d,%d) from img=%d is [", x, y, img_num);
-
-					for (ch = 0; ch < RESULT_CHANNELS; ch++) {
-						unsigned int data = FIFO_READ;
-						//printf("Read (x,y)=(%d,%d), ch=%d, last=%d, tag=%d, value=%d\n", x, y, ch, last, tag, pixel_value);
-						printf("%d, ", data);
-						//assert(tag == img_num);
-						//assert(last == (y == RESULT_HEIGHT-1));
-					}
-					printf("]\n");
-				}
-			}
-			//printf("Read %d resulting values\n", RESULT_HEIGHT*RESULT_WIDTH*RESULT_CHANNELS);
-			
-
-			i = 0;
-			while (!READ_FIFO_EMPTY) {
-				FIFO_READ;
-				i++;
-			}
-			printf("Flushed FIFO read queue with %d elements\n", i);
+		if (!f) {
+			fprintf(stderr, "Failed to open file: %s\n", argv[1]);
+			exit(1);
 		}
+		fseek(f, 0, SEEK_END);
+		size = ftell(f);
+		size = size/4 + (size%4!=0);
+		rewind(f);
+
+		printf("File is %d words (4 bytes/word)\n", size);
+		#define BUFFER_SIZE 1000
+		unsigned int buffer[BUFFER_SIZE];
+		assert(size < BUFFER_SIZE);
+		i = 0;
+		while(!feof(f))
+		{
+	
+			fread(&buffer[i], 1, sizeof(buffer[i]), f);
+			i++;
+		}
+		printf("Read %d of %d bytes from file.\n", i, size);
+		fclose(f);
+
+		const int RESULT_CHANNELS = 10;
+		unsigned int result[RESULT_CHANNELS];
+		
+		// WRITE THE FIRST IMAGE AND STORE ITS RESULT
+
+		FIFO_WRITE_BLOCK(size);
+		for (i = 0; i < size; i++) {
+			FIFO_WRITE_BLOCK(buffer[i]);
+		}
+		
+		int ch;
+		printf("Read from first image is [");
+		i = 0;
+		for (ch = 0; ch < RESULT_CHANNELS; ch++) {
+			while(READ_FIFO_EMPTY) { i++; }
+			unsigned int data = FIFO_READ;
+			result[ch] = data; //store for verification later
+			printf("%d, ", data);
+		}
+		printf("] spin_delay=%d\n", i);
+			
+		
+
+		printf("Starting Performance Test...\n");
+		long long start = timeInMilliseconds();
+
+		int count_in_flight = 0;
+		int img_write_num = 0;
+		int img_read_num = 0;
+		while (img_read_num < img_count) {
+			
+			// If there is content to read, or we already maxed out writes, that always gets priority
+			if (!READ_FIFO_EMPTY || count_in_flight == max_in_flight) {
+				// Read result from image and ensure it matches
+				for (ch = 0; ch < RESULT_CHANNELS; ch++) {
+					while(READ_FIFO_EMPTY) {} // make sure next byte is ready to read
+					unsigned int data = FIFO_READ;
+					assert(result[ch] == data); 
+				}
+				img_read_num++;
+				count_in_flight--;
+				assert(count_in_flight >= 0);
+				continue;
+			}
+
+			// Garunteed there was nothing to read and we have not maxed out writes 
+			if (count_in_flight < max_in_flight && img_write_num < img_count) {
+				// Write the image 
+				FIFO_WRITE_BLOCK(size);
+				for (i = 0; i < size; i++) {
+					FIFO_WRITE_BLOCK(buffer[i]);
+				}
+				img_write_num++;
+				count_in_flight++;
+			}
+		}
+		
+		double delay = (double)(timeInMilliseconds() - start)/1000.0;
+		printf("Completed performance test in %.2f seconds at throughput of %d images per second\n",  delay, (int)(img_count/delay));
+		assert(img_write_num == img_read_num);
+		assert(img_write_num == img_count);
+		assert(count_in_flight == 0);
+		usleep(10000); 
+		assert_fifo_empty("program done");
 	} else {
-		printf("Usage: sudo ./command <file>\n");
+		printf("Usage: sudo ./command <file> <img_count> <max_in_flight>\n");
 	}
 
 
