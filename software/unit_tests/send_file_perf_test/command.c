@@ -125,6 +125,13 @@ void assert_fifo_empty(const char* tag) {
 	}
 }
 
+long long timeInMilliseconds(void) {
+    struct timeval tv;
+
+    gettimeofday(&tv,NULL);
+    return (((long long)tv.tv_sec)*1000)+(tv.tv_usec/1000);
+}
+
 int main (int argc, char *argv[])
 {	
 	// === get FPGA addresses ==================
@@ -176,11 +183,10 @@ int main (int argc, char *argv[])
 	//============================================
 	//printf("Usage: sudo ./command <file>\n");
 
-	
-	int img_count = 1;
 
-	if (argc >= 2) {
-		if (argc >= 3) img_count = atoi(argv[2]);
+	if (argc == 4) {
+		int img_count = atoi(argv[2]);
+		int max_in_flight = atoi(argv[3]);
 
 		// PRELOAD EVERYTHING INTO MEMORY TO MAKE AS FAST AS POSSIBLE
 
@@ -212,10 +218,8 @@ int main (int argc, char *argv[])
 		printf("Read %d of %d bytes from file.\n", i, size);
 		fclose(f);
 
-		const int RESULT_WIDTH = 1;
-		const int RESULT_HEIGHT = 1;
 		const int RESULT_CHANNELS = 10;
-		unsigned int result[RESULT_WIDTH][RESULT_HEIGHT][RESULT_CHANNELS];
+		unsigned int result[RESULT_CHANNELS];
 		
 		// WRITE THE FIRST IMAGE AND STORE ITS RESULT
 
@@ -224,51 +228,62 @@ int main (int argc, char *argv[])
 			FIFO_WRITE_BLOCK(buffer[i]);
 		}
 		
-		int x, y, ch;
-		for (y = 0; y < RESULT_HEIGHT; y++) {
-			for (x = 0; x < RESULT_WIDTH; x++) {
-				printf("Read (x,y)=(%d,%d) from first image is [", x, y);
-				i = 0;
-				for (ch = 0; ch < RESULT_CHANNELS; ch++) {
-					while(READ_FIFO_EMPTY) { i++; }
-					unsigned int data = FIFO_READ;
-					result[x][y][ch] = data; //store for verification later
-					printf("%d, ", data);
-				}
-				printf("] spin_delay=%d\n", i);
-			}
+		int ch;
+		printf("Read from first image is [");
+		i = 0;
+		for (ch = 0; ch < RESULT_CHANNELS; ch++) {
+			while(READ_FIFO_EMPTY) { i++; }
+			unsigned int data = FIFO_READ;
+			result[ch] = data; //store for verification later
+			printf("%d, ", data);
 		}
+		printf("] spin_delay=%d\n", i);
+			
+		
 
 		printf("Starting Performance Test...\n");
-		time_t start = time(NULL);
+		long long start = timeInMilliseconds();
 
-		int img_num;
-		for (img_num = 0; img_num < img_count; img_num++) {
-			assert_fifo_empty("image_start");
-
-			// Write the image 
-			FIFO_WRITE_BLOCK(size);
-			for (i = 0; i < size; i++) {
-				FIFO_WRITE_BLOCK(buffer[i]);
+		int count_in_flight = 0;
+		int img_write_num = 0;
+		int img_read_num = 0;
+		while (img_read_num < img_count) {
+			
+			// If there is content to read, or we already maxed out writes, that always gets priority
+			if (!READ_FIFO_EMPTY || count_in_flight == max_in_flight) {
+				// Read result from image and ensure it matches
+				for (ch = 0; ch < RESULT_CHANNELS; ch++) {
+					while(READ_FIFO_EMPTY) {} // make sure next byte is ready to read
+					unsigned int data = FIFO_READ;
+					assert(result[ch] == data); 
+				}
+				img_read_num++;
+				count_in_flight--;
+				assert(count_in_flight >= 0);
+				continue;
 			}
 
-			// Read result from image and ensure it matches
-			for (y = 0; y < RESULT_HEIGHT; y++) {
-				for (x = 0; x < RESULT_WIDTH; x++) {
-					for (ch = 0; ch < RESULT_CHANNELS; ch++) {
-						while(READ_FIFO_EMPTY) {}
-						unsigned int data = FIFO_READ;
-						assert(result[x][y][ch] == data); 
-					}
+			// Garunteed there was nothing to read and we have not maxed out writes 
+			if (count_in_flight < max_in_flight && img_write_num < img_count) {
+				// Write the image 
+				FIFO_WRITE_BLOCK(size);
+				for (i = 0; i < size; i++) {
+					FIFO_WRITE_BLOCK(buffer[i]);
 				}
+				img_write_num++;
+				count_in_flight++;
 			}
 		}
 		
-		double delay = (double)(time(NULL) - start);
+		double delay = (double)(timeInMilliseconds() - start)/1000.0;
 		printf("Completed performance test in %.2f seconds at throughput of %d images per second\n",  delay, (int)(img_count/delay));
-
+		assert(img_write_num == img_read_num);
+		assert(img_write_num == img_count);
+		assert(count_in_flight == 0);
+		usleep(10000); 
+		assert_fifo_empty("program done");
 	} else {
-		printf("Usage: sudo ./command <file>\n");
+		printf("Usage: sudo ./command <file> <img_count> <max_in_flight>\n");
 	}
 
 
