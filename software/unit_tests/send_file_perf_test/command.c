@@ -182,70 +182,91 @@ int main (int argc, char *argv[])
 	if (argc >= 2) {
 		if (argc >= 3) img_count = atoi(argv[2]);
 
+		// PRELOAD EVERYTHING INTO MEMORY TO MAKE AS FAST AS POSSIBLE
+
+		int size;
+		// Get size
+		printf("Opening file %s\n", argv[1]);
+		FILE* f = fopen(argv[1], "rb");
+		
+		if (!f) {
+			fprintf(stderr, "Failed to open file: %s\n", argv[1]);
+			exit(1);
+		}
+		fseek(f, 0, SEEK_END);
+		size = ftell(f);
+		size = size/4 + (size%4!=0);
+		rewind(f);
+
+		printf("File is %d words (4 bytes/word)\n", size);
+		#define BUFFER_SIZE 1000
+		unsigned int buffer[BUFFER_SIZE];
+		assert(size < BUFFER_SIZE);
+		i = 0;
+		while(!feof(f))
+		{
+	
+			fread(&buffer[i], 1, sizeof(buffer[i]), f);
+			i++;
+		}
+		printf("Read %d of %d bytes from file.\n", i, size);
+		fclose(f);
+
+		const int RESULT_WIDTH = 1;
+		const int RESULT_HEIGHT = 1;
+		const int RESULT_CHANNELS = 10;
+		unsigned int result[RESULT_WIDTH][RESULT_HEIGHT][RESULT_CHANNELS];
+		
+		// WRITE THE FIRST IMAGE AND STORE ITS RESULT
+
+		FIFO_WRITE_BLOCK(size);
+		for (i = 0; i < size; i++) {
+			FIFO_WRITE_BLOCK(buffer[i]);
+		}
+		
+		int x, y, ch;
+		for (y = 0; y < RESULT_HEIGHT; y++) {
+			for (x = 0; x < RESULT_WIDTH; x++) {
+				printf("Read (x,y)=(%d,%d) from first image is [", x, y);
+				i = 0;
+				for (ch = 0; ch < RESULT_CHANNELS; ch++) {
+					while(READ_FIFO_EMPTY) { i++; }
+					unsigned int data = FIFO_READ;
+					result[x][y][ch] = data; //store for verification later
+					printf("%d, ", data);
+				}
+				printf("] spin_delay=%d\n", i);
+			}
+		}
+
+		printf("Starting Performance Test...\n");
+		time_t start = time(NULL);
+
 		int img_num;
 		for (img_num = 0; img_num < img_count; img_num++) {
-			assert_fifo_empty("start");
-			int size;
-			// Get size
-			printf("Opening file %s\n", argv[1]);
-			FILE* f = fopen(argv[1], "rb");
-			
-			if (!f) {
-				fprintf(stderr, "Failed to open file: %s\n", argv[1]);
-				exit(1);
-			}
-			fseek(f, 0, SEEK_END);
-			size = ftell(f);
-			size = size/4 + (size%4!=0);
-			rewind(f);
+			assert_fifo_empty("image_start");
 
-			printf("File is %d words (4 bytes/word)\n", size);
-			assert_fifo_empty("before_write_size");
+			// Write the image 
 			FIFO_WRITE_BLOCK(size);
-			assert_fifo_empty("after_write_size");
-			i = 0;
-			while(!feof(f))
-			{
-				unsigned int word = 0;
-				//cannot do more then 4 bytes at a time
-		
-				fread(&word, 1, sizeof(word),f);
-				FIFO_WRITE_BLOCK(word);
-				if (!feof(f)) assert_fifo_empty("after_write_word");
-				i++;
-				//printf("Writing word  =0x%x\n", word);
-			}
-			printf("Wrote %d of %d bytes from file.\n", i, size);
-			fclose(f);
-
-			//usleep(1000);
-			i = 0;
-			while(READ_FIFO_EMPTY) {
-				i++;
+			for (i = 0; i < size; i++) {
+				FIFO_WRITE_BLOCK(buffer[i]);
 			}
 
-			const int RESULT_WIDTH = 1;
-			const int RESULT_HEIGHT = 1;
-			const int RESULT_CHANNELS = 10;
-			int x, y, ch;
+			// Read result from image and ensure it matches
 			for (y = 0; y < RESULT_HEIGHT; y++) {
 				for (x = 0; x < RESULT_WIDTH; x++) {
-					int ch;
-					printf("Read (x,y)=(%d,%d) from img=%d is [", x, y, img_num);
-
 					for (ch = 0; ch < RESULT_CHANNELS; ch++) {
+						while(READ_FIFO_EMPTY) {}
 						unsigned int data = FIFO_READ;
-						//printf("Read (x,y)=(%d,%d), ch=%d, last=%d, tag=%d, value=%d\n", x, y, ch, last, tag, pixel_value);
-						printf("%d, ", data);
-						//assert(tag == img_num);
-						//assert(last == (y == RESULT_HEIGHT-1));
+						assert(result[x][y][ch] == data); 
 					}
-					printf("] spin_delay=%d\n", i);
 				}
 			}
-			//printf("Read %d resulting values\n", RESULT_HEIGHT*RESULT_WIDTH*RESULT_CHANNELS);
-			assert_fifo_empty("after_read_result");
 		}
+		
+		double delay = (double)(time(NULL) - start);
+		printf("Completed performance test in %.2f seconds at throughput of %d images per second\n",  delay, (int)(img_count/delay));
+
 	} else {
 		printf("Usage: sudo ./command <file>\n");
 	}
