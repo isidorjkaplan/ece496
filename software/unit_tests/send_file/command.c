@@ -109,6 +109,22 @@ void read_next() {
 	print_data(FIFO_READ);
 }
 
+void assert_fifo_empty(const char* tag) {
+	//usleep(100);  
+
+	int i = 0;
+	while (!READ_FIFO_EMPTY) {
+		FIFO_READ;
+		
+		i++;
+	}
+	
+	if (i > 0) {
+		printf("ERROR (tag=%s): Flushed FIFO read queue with %d elements when expecting no elements\n", tag, i);
+		exit(1);
+	}
+}
+
 int main (int argc, char *argv[])
 {	
 	// === get FPGA addresses ==================
@@ -168,6 +184,7 @@ int main (int argc, char *argv[])
 
 		int img_num;
 		for (img_num = 0; img_num < img_count; img_num++) {
+			assert_fifo_empty("start");
 			int size;
 			// Get size
 			printf("Opening file %s\n", argv[1]);
@@ -183,7 +200,9 @@ int main (int argc, char *argv[])
 			rewind(f);
 
 			printf("File is %d words (4 bytes/word)\n", size);
+			assert_fifo_empty("before_write_size");
 			FIFO_WRITE_BLOCK(size);
+			assert_fifo_empty("after_write_size");
 			i = 0;
 			while(!feof(f))
 			{
@@ -192,11 +211,18 @@ int main (int argc, char *argv[])
 		
 				fread(&word, 1, sizeof(word),f);
 				FIFO_WRITE_BLOCK(word);
+				if (!feof(f)) assert_fifo_empty("after_write_word");
 				i++;
 				//printf("Writing word  =0x%x\n", word);
 			}
 			printf("Wrote %d of %d bytes from file.\n", i, size);
 			fclose(f);
+
+			//usleep(1000);
+			i = 0;
+			while(READ_FIFO_EMPTY) {
+				i++;
+			}
 
 			const int RESULT_WIDTH = 1;
 			const int RESULT_HEIGHT = 1;
@@ -214,18 +240,11 @@ int main (int argc, char *argv[])
 						//assert(tag == img_num);
 						//assert(last == (y == RESULT_HEIGHT-1));
 					}
-					printf("]\n");
+					printf("] spin_delay=%d\n", i);
 				}
 			}
 			//printf("Read %d resulting values\n", RESULT_HEIGHT*RESULT_WIDTH*RESULT_CHANNELS);
-			
-
-			i = 0;
-			while (!READ_FIFO_EMPTY) {
-				FIFO_READ;
-				i++;
-			}
-			printf("Flushed FIFO read queue with %d elements\n", i);
+			assert_fifo_empty("after_read_result");
 		}
 	} else {
 		printf("Usage: sudo ./command <file>\n");
