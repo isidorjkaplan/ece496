@@ -175,6 +175,7 @@ void initFPGABus() {
 void recvFromFPGA(int* buf) {
     int* bstart = buf;
     int numtoread = 10;
+    PRINTF("\nBegin recieving from FPGA\n");
     while (numtoread > 0) {
         //if (!READ_FIFO_EMPTY) {
             unsigned int val;
@@ -192,28 +193,21 @@ void recvFromFPGA(int* buf) {
 }
 
 // Send data contained within buf to FPGA
-// Hard-coded buffer size
-void sendToFPGA(char* buf) {
-    const int X = 28;
-    const int Y = X;
-    // This is a feature of the neural network architecture chosen
-    const int NUM_ROWS_FOR_VALID_OUTPUT = 28;
-    const int RESULT_WIDTH = 7;
-    const int RESULT_CHANNELS = 10;
-    const int INPUT_SHIFT = 7;
+// Flexible buffer size. 
+void sendToFPGA(std::vector<char>& buf) {
+    // Write size in host order
     
-    int x, y;
-    int out_row_count = 0;
-    for (y=0; y < Y; y++) {
-        for (x=0; x < X; x++) {
-            unsigned int finish = y==Y-1 && x==X-1;
-            finish <<= 30;
-            PRINTF("F: %d\n", finish);
-            FIFO_WRITE_BLOCK(((unsigned int)(unsigned char)buf[x + 28*y]) | finish);
-            PRINTF("E: %x", (((unsigned int)(unsigned char)buf[x + 28*y]) | finish));
-        }
+    PRINTF("\nBegin sending to FPGA, buf size is %d\n", buf.size());
+    unsigned int newsize_w = (buf.size()+3)/4;
+    FIFO_WRITE_BLOCK(((unsigned int)(newsize_w)));
+    buf.resize(newsize_w * 4, 0);
+    PRINTF("\nSend size %d, now sending resized buffer of size %d\n", newsize_w, buf.size());
+    for (int i = 0; i < buf.size(); i+=4) {   
+        FIFO_WRITE_BLOCK(*((unsigned int*)&(buf[i]))); // TODO: avoid segfault on unaligned buf
+        PRINTF("E: %x", (*((unsigned int*)&(buf[i]))));
     }
     
+    PRINTF("\nFinished sending to FPGA\n");
 }
 
 // Represents dimensions of image
@@ -572,9 +566,7 @@ void* listenForever(void*) {
         std::cout << "About to listen" << std::endl; 
 #endif
         client_sock = accept(sock, (sockaddr*)&client_addr, &client_addr_size);
-#ifdef DEBUG
         std::cout << "Accepting a connection" << std::endl; 
-#endif
         if (client_sock == -1) {std::cerr << "Error accepting connection" << std::endl; return (void*)1;}
         serverInfo.makeClient(client_sock);
 #ifdef DEBUG
@@ -594,6 +586,7 @@ void* manageFPGAForever(void*) {
 #ifdef DEBUG
         std::cout << "Initialized FPGA bus" << std::endl; 
 #endif
+    std::queue<int> dest_client;
     while (true) {
         // decr main semaphore
         // incr main semaphore
@@ -611,11 +604,12 @@ void* manageFPGAForever(void*) {
 #endif
                 sem_wait(&serverInfo.sema);
                 // decr main semaphore
-                sendToFPGA(&pix_buf[0]);
+                sendToFPGA(pix_buf);
                 pix_buf.resize(4 * 10);
 #ifdef DEBUG
                 std::cout << "Sent to FPGA ... Waiting for response" << std::endl;
 #endif
+
                 recvFromFPGA((int*)&pix_buf[0]);
                 
 #ifdef DEBUG
@@ -638,7 +632,7 @@ void* recieveForever(void* clientInfo_ptr) {
     std::vector<char> img_data; // // move outside loop to avoid excessive allocations.
     while (true) {
         
-        std::vector<char> pixbuf; 
+        //std::vector<char> pixbuf; 
         
         int32_t img_size;
         int offset = 0;
@@ -666,12 +660,12 @@ void* recieveForever(void* clientInfo_ptr) {
             img_size -= amt_to_read;
         }
 
-        // process image
-        res = jpeg_to_neural(img_data, pixbuf);
-        if (res != 0) {return (void*)1;}
+        // process image: deprecated due to offloading to FPGA
+        // res = jpeg_to_neural(img_data, pixbuf);
+        // if (res != 0) {return (void*)1;}
 
         // queue for access to FPGA
-        c.imageQueue.push(std::move(pixbuf));
+        c.imageQueue.push(std::move(img_data));
         sem_post(&serverInfo.sema);
     }
 
