@@ -7,9 +7,11 @@ view wave
 
 add wave -hex dut/*
 add wave -hex dut/jpeg/in_*
+add wave -unsigned dut/counter_q
+add wave -hex dut/send_jpeg_last_q
 #add wave -unsigned dut/jpeg/idle_o
 #add wave -unsigned dut/jpeg/*byte_idx_q
-#add wave dut/jpeg/inport*
+add wave dut/jpeg/inport*
 #add wave -hex dut/jpeg/jpeg/u_jpeg_input/last_b_q
 #add wave -hex dut/jpeg/jpeg/u_jpeg_input/data_r
 #add wave -unsigned dut/jpeg/jpeg/u_jpeg_input/state_q

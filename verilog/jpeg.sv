@@ -229,7 +229,11 @@ module jpeg_decoder #(
             result_y_q <= 0;
         end else begin // Not in reset
             // Increment row counter when we get a pixel result
-            if (outport_valid_o && outport_accept_i && outport_pixel_x_o < WIDTH && outport_pixel_y_o < HEIGHT) begin
+            if (outport_valid_o && outport_accept_i && outport_pixel_x_o < WIDTH && outport_pixel_y_o < HEIGHT
+                // REST OF CONDITION IS TO DEAL WITH CASE WHERE JPEG DECODER EXPLODES -- HACK WARNING
+                && row_result_count_q[outport_pixel_y_o] < WIDTH 
+                && (outport_pixel_y_o > result_y_q || (outport_pixel_y_o==result_y_q && !out_valid)) 
+                ) begin
                 row_result_count_q[outport_pixel_y_o] <= row_result_count_q[outport_pixel_y_o]+1;
             end
 
