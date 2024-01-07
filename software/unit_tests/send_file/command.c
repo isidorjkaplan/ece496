@@ -197,6 +197,7 @@ int main (int argc, char *argv[])
 			fseek(f, 0, SEEK_END);
 			size = ftell(f);
 			size = size/4 + (size%4!=0);
+			int size_overflow = size%4; // how many bytes of overflow is there
 			rewind(f);
 
 			printf("File is %d words (4 bytes/word)\n", size);
@@ -204,13 +205,14 @@ int main (int argc, char *argv[])
 			FIFO_WRITE_BLOCK(size);
 			assert_fifo_empty("after_write_size");
 			i = 0;
-			while(!feof(f))
+			while(!feof(f) && i < size)
 			{
 				unsigned int word = 0;
 				//cannot do more then 4 bytes at a time
 		
 				fread(&word, 1, sizeof(word),f);
 				FIFO_WRITE_BLOCK(word);
+				//printf("Word: %08x\n", word);
 				if (!feof(f)) assert_fifo_empty("after_write_word");
 				i++;
 				//printf("Writing word  =0x%x\n", word);
@@ -222,6 +224,10 @@ int main (int argc, char *argv[])
 			i = 0;
 			while(READ_FIFO_EMPTY) {
 				i++;
+				if (i > 1000*1000) {
+					printf("ERROR: Did not recieve reply for too long!\n");
+					exit(1);
+				}
 			}
 
 			const int RESULT_WIDTH = 1;
