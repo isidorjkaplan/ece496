@@ -336,6 +336,7 @@ void* listenForever(void*);
 // When this happens, send as many waiting images as possible to FPGA
 // Then, add results to appropriate queues to be transmitted
 void* manageFPGAForever(void*);
+void* manageFPGAForever2(void*);
 
 
 // per client:
@@ -456,9 +457,11 @@ struct ClientInfo {
 
 class ServerInfo {
 public:
-    sem_t sema;
+    sem_t imagesOnARM;
+    sem_t imagesInFPGA;
     sem_t deadClients;
 
+    std::queue<int> dest_client;
 
     std::array<ClientInfo, NUM_SIM_CLIENTS> clients;
     bool canMakeClient() {
@@ -505,11 +508,13 @@ public:
         for (ClientInfo& c : clients) {
             c.parent = this;
         }
-        sem_init(&sema, 0, 0);
+        sem_init(&imagesOnARM, 0, 0);
+        sem_init(&imagesInFPGA, 0, 0);
         sem_init(&deadClients, 0, NUM_SIM_CLIENTS);
     }
     ~ServerInfo() {
-        sem_destroy(&sema);
+        sem_destroy(&imagesOnARM);
+        sem_destroy(&imagesInFPGA);
         sem_destroy(&deadClients);
     }
 };
@@ -586,38 +591,59 @@ void* manageFPGAForever(void*) {
 #ifdef DEBUG
         std::cout << "Initialized FPGA bus" << std::endl; 
 #endif
-    std::queue<int> dest_client;
     while (true) {
-        // decr main semaphore
-        // incr main semaphore
-        sem_wait(&serverInfo.sema);
-        sem_post(&serverInfo.sema);
+        // turnstile so that we don't busy-wait when there are no images to process
+        sem_wait(&serverInfo.imagesOnARM);
+        sem_post(&serverInfo.imagesOnARM);
+
 
 #ifdef DEBUG
         std::cout << "Manager awoken" << std::endl; 
 #endif
+        
+
+        // send images out to FPGA
         for (int i = 0; i < NUM_SIM_CLIENTS; ++i) {
             std::vector<char> pix_buf = serverInfo.clients[i].imageQueue.try_pop();
             if (pix_buf.size() != 0) {
-#ifdef DEBUG
-        std::cout << "Manager is sending to FPGA..." << std::endl; 
-#endif
-                sem_wait(&serverInfo.sema);
+                
+                #ifdef DEBUG
+                    std::cout << "Manager is sending to FPGA..." << std::endl; 
+                #endif
+                sem_wait(&serverInfo.imagesOnARM);
+                serverInfo.dest_client.push(i);
+
                 // decr main semaphore
                 sendToFPGA(pix_buf);
-                pix_buf.resize(4 * 10);
-#ifdef DEBUG
-                std::cout << "Sent to FPGA ... Waiting for response" << std::endl;
-#endif
-
-                recvFromFPGA((int*)&pix_buf[0]);
                 
-#ifdef DEBUG
-                std::cout << "Recieved from FPGA" << std::endl;
-#endif
-                serverInfo.clients[i].resultsQueue.push(std::move(pix_buf));
+                sem_post(&serverInfo.imagesInFPGA);
+                #ifdef DEBUG
+                    std::cout << "Sent image to FPGA" << std::endl;
+                #endif
+
+                
+
             }
         }
+    }
+}
+
+void* manageFPGAForever2(void*) {
+    while (true) {
+        sem_wait(&serverInfo.imagesInFPGA);
+        #ifdef DEBUG
+            std::cout << "Waiting for response from FPGA" << std::endl;
+        #endif
+        int c = serverInfo.dest_client.front();
+        serverInfo.dest_client.pop();
+        
+        std::vector<char> pix_buf(10 * 4);
+        recvFromFPGA((int*)&pix_buf[0]);
+        
+        #ifdef DEBUG
+            std::cout << "Recieved from FPGA" << std::endl;
+        #endif
+        serverInfo.clients[c].resultsQueue.push(std::move(pix_buf));
     }
 }
 
@@ -666,7 +692,7 @@ void* recieveForever(void* clientInfo_ptr) {
 
         // queue for access to FPGA
         c.imageQueue.push(std::move(img_data));
-        sem_post(&serverInfo.sema);
+        sem_post(&serverInfo.imagesOnARM);
     }
 
     // destroy the client?
@@ -723,10 +749,11 @@ void* transmitForever(void* clientInfo_ptr) {
 // The software server
 int main(int argc, char* argv[]) {
    
-    pthread_t manager, listener;
+    pthread_t manager, manager2, listener;
    std::cout << "Starting Server" <<std::endl;
     // create the listener and manager threads
     pthread_create(&manager,  NULL, manageFPGAForever, NULL);
+    pthread_create(&manager2,  NULL, manageFPGAForever2, NULL);
     pthread_create(&listener, NULL, listenForever, NULL);
 
 
