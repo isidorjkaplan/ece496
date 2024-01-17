@@ -76,6 +76,7 @@ print(next(model.parameters()).is_cuda)
 images = []
 paths = []
 answers = []
+outputs = []
 folder = "pics/"
 
 for fname in os.listdir(folder):
@@ -117,16 +118,19 @@ start = time.time_ns()
 
 for i in range(len(images)):
     # inference
-    output = model(images[i])
+    outputs.append(model(images[i]))
     # print(paths[i])
     # print("ans = %d" % answers[i])
     # print(int(torch.max(out, 0)[1]))
     # print((int(torch.max(out, 0)[1]) == answers[i]))
-    if int(torch.max(output, 0)[1]) == answers[i]:
-        correct_count = correct_count + 1
 
 end = time.time_ns()
 time_elapsed = end - start
+
+for i in range(len(images)):
+    if int(torch.max(outputs[i], 0)[1]) == answers[i]:
+        correct_count = correct_count + 1
+
 print("image tested: %d" % len(images))
 print("time elapsed (ns) = %d" % time_elapsed)
 print("time elapsed per img(ns) = %d" % (time_elapsed/60000))
