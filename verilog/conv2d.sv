@@ -277,24 +277,22 @@ module conv2d_single_in_mult_out #(
         if(reset) begin
             counter <= '0;
             o_valid_q <= 0;
-            dsp_counter <= 0;
+
         end
         // if true it means that we computed the last o_data signal last cycle so we are done
         // written this way for now due to easier logic, wastes one cycle here
         else if(counter == OUTPUT_CHANNELS) begin
             counter <= '0;
-            dsp_counter <= 0;
+
             o_valid_q <= 1;
         end
         // if taps is valid and we haven't generated output yet then increment counter every cycle
         // increment to work with different channel's weight and log them in correct position when computed
         // we will stay in each counter for two cycles due to timing limitation
         else if(taps_valid_q && !o_valid_q) begin
-            if(dsp_counter) begin
-                counter <= counter + 1;
-                dsp_counter <= ~dsp_counter;
-            end
-            dsp_counter <= ~dsp_counter;
+
+            counter <= counter + 1;
+
         end
         // if data is computed and output is ready to consume, then next posedge it will be consumed
         // then lower o_valid_q
@@ -315,17 +313,18 @@ module conv2d_single_in_mult_out #(
     always_ff@(posedge clk) begin
         if(counter < OUTPUT_CHANNELS && !o_valid_q) begin
             // sum into o_data_q
-            o_data_q[counter] <= next_o_data;   
-            // multiply into intermediate register for timing
-            for (int row = 0; row < KERNAL_SIZE; row++) begin
-                for (int col = 0; col < KERNAL_SIZE; col++) begin
-                    mult_out[row*KERNAL_SIZE + col] <= i_weights[counter][row][col] * taps_q[row][col];
-                end
-            end         
+            o_data_q[counter] <= next_o_data;          
         end
     end
 
     always_comb begin
+        // multiply into intermediate register for timing
+        for (int row = 0; row < KERNAL_SIZE; row++) begin
+            for (int col = 0; col < KERNAL_SIZE; col++) begin
+                mult_out[row*KERNAL_SIZE + col] = i_weights[counter][row][col] * taps_q[row][col];
+            end
+        end  
+
         next_o_data = '0;
         for(int idx = 0; idx < (KERNAL_SIZE*KERNAL_SIZE); idx++) begin
             next_o_data += mult_out[idx][VALUE_Q_FORMAT_N+:VALUE_BITS];
