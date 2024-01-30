@@ -91,7 +91,7 @@ module system_top(
     logic jpeg_out_last;
     logic model_ready;
 
-    jpeg_decoder #(.WIDTH(WIDTH), .HEIGHT(WIDTH),.MAX_JPEG_WORDS(MAX_JPEG_WORDS))jpeg(
+    jpeg_decoder_array #(.NUM_DECODERS(2), .WIDTH(WIDTH), .HEIGHT(WIDTH),.MAX_JPEG_WORDS(MAX_JPEG_WORDS))jpeg(
         .clk(clock), .reset(soft_reset),
         .in_data(in_data), .in_valid((in_valid && (counter_q!=0)) || send_jpeg_last_q), 
         .in_ready(in_ready), .in_last(send_jpeg_last_q),
