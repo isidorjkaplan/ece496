@@ -7,7 +7,8 @@ module conv2d #(
     parameter OUTPUT_CHANNELS,
     parameter INPUT_CHANNELS,
     parameter STRIDE,
-    parameter RELU
+    parameter RELU,
+    parameter OUT_CHANNELS_PER_CYCLE = 1
 ) (
     // general
     input   logic                               clk,                                    // Operating clock
@@ -145,7 +146,8 @@ module conv2d #(
                 .KERNAL_SIZE(KERNAL_SIZE),
                 .VALUE_BITS(VALUE_BITS),
                 .VALUE_Q_FORMAT_N(VALUE_Q_FORMAT_N),
-                .OUTPUT_CHANNELS(OUTPUT_CHANNELS)
+                .OUTPUT_CHANNELS(OUTPUT_CHANNELS),
+                .OUT_CHANNELS_PER_CYCLE(OUT_CHANNELS_PER_CYCLE)
             ) channel(
                 .clk(clk),
                 .reset(reset),
@@ -172,7 +174,8 @@ module conv2d_single_in_mult_out #(
     parameter KERNAL_SIZE, 
     parameter VALUE_BITS,
     parameter VALUE_Q_FORMAT_N,
-    parameter OUTPUT_CHANNELS
+    parameter OUTPUT_CHANNELS,
+    parameter OUT_CHANNELS_PER_CYCLE
 ) (
     // general
     input   logic                               clk,                                    // Operating clock
@@ -203,11 +206,9 @@ module conv2d_single_in_mult_out #(
     logic                               taps_last_q;
 
     // generate output data
-    logic [$clog2(OUTPUT_CHANNELS):0]   counter;
+    logic [$clog2(OUTPUT_CHANNELS+OUT_CHANNELS_PER_CYCLE):0]   counter;
     logic signed [VALUE_BITS-1:0]       o_data_q[OUTPUT_CHANNELS];
     logic                               o_valid_q;
-    logic signed [VALUE_BITS*2-1:0]     mult_out[KERNAL_SIZE*KERNAL_SIZE];
-    logic signed [VALUE_BITS-1:0]       next_o_data;
     logic signed [VALUE_BITS-1:0]       weights[KERNAL_SIZE][KERNAL_SIZE];
     // use dsp counter so counter value increment every three cycle
     // first cycle correct weights loaded into register from i_weight
@@ -281,7 +282,7 @@ module conv2d_single_in_mult_out #(
         end
         // if true it means that we computed the last o_data signal last cycle so we are done
         // written this way for now due to easier logic, wastes one cycle here
-        else if(counter == OUTPUT_CHANNELS) begin
+        else if(counter >= OUTPUT_CHANNELS) begin
             counter <= '0;
 
             o_valid_q <= 1;
@@ -291,7 +292,7 @@ module conv2d_single_in_mult_out #(
         // we will stay in each counter for two cycles due to timing limitation
         else if(taps_valid_q && !o_valid_q) begin
 
-            counter <= counter + 1;
+            counter <= counter + OUT_CHANNELS_PER_CYCLE;
 
         end
         // if data is computed and output is ready to consume, then next posedge it will be consumed
@@ -310,24 +311,32 @@ module conv2d_single_in_mult_out #(
     // takes 2 cycle to compute and have it loaded in o_data_q
     // 1st cycle: weighted average of 9 pixels calculated
     // 2nd cycle: sum of the 9 weighted average loaded to o_data_q
+    //wire [$clog2(OUT_CHANNELS_PER_CYCLE):0] out_idx;
+    logic signed [VALUE_BITS-1:0]       next_o_data[OUT_CHANNELS_PER_CYCLE];
+    logic signed [VALUE_BITS*2-1:0]     mult_out[OUT_CHANNELS_PER_CYCLE][KERNAL_SIZE*KERNAL_SIZE];
+
     always_ff@(posedge clk) begin
-        if(counter < OUTPUT_CHANNELS && !o_valid_q) begin
-            // sum into o_data_q
-            o_data_q[counter] <= next_o_data;          
+        // sum into o_data_q
+        for (integer out_idx = 0; out_idx < OUT_CHANNELS_PER_CYCLE; out_idx++) begin
+            if(counter+out_idx < OUTPUT_CHANNELS && !o_valid_q) begin
+                o_data_q[counter+out_idx] <= next_o_data[out_idx];  
+            end     
         end
     end
 
     always_comb begin
-        // multiply into intermediate register for timing
-        for (int row = 0; row < KERNAL_SIZE; row++) begin
-            for (int col = 0; col < KERNAL_SIZE; col++) begin
-                mult_out[row*KERNAL_SIZE + col] = i_weights[counter][row][col] * taps_q[row][col];
-            end
-        end  
+        for (integer out_idx = 0; out_idx < OUT_CHANNELS_PER_CYCLE; out_idx++) begin
+            // multiply into intermediate register for timing
+            for (int row = 0; row < KERNAL_SIZE; row++) begin
+                for (int col = 0; col < KERNAL_SIZE; col++) begin
+                    mult_out[out_idx][row*KERNAL_SIZE + col] = i_weights[counter+out_idx][row][col] * taps_q[row][col];
+                end
+            end  
 
-        next_o_data = '0;
-        for(int idx = 0; idx < (KERNAL_SIZE*KERNAL_SIZE); idx++) begin
-            next_o_data += mult_out[idx][VALUE_Q_FORMAT_N+:VALUE_BITS];
+            next_o_data[out_idx] = '0;
+            for(int idx = 0; idx < (KERNAL_SIZE*KERNAL_SIZE); idx++) begin
+                next_o_data[out_idx] += mult_out[out_idx][idx][VALUE_Q_FORMAT_N+:VALUE_BITS];
+            end
         end
     end
 
