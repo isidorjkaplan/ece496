@@ -1,0 +1,28 @@
+import os
+import struct
+from PIL import Image
+from time import sleep
+import subprocess
+
+ilist = os.listdir("./test_files")
+guesslist = [];
+
+ilist = list([i for i in ilist if "result" in i])
+
+for f in ilist:
+    with open("./test_files/"+f, "rb") as file:
+        cont = file.read();
+        guesslist.append(struct.unpack("I" * (len(cont)//4), cont))
+        #print(f, guesslist[-1])
+assert len(guesslist) == len(ilist)
+
+
+num_correct = 0
+for i in range(len(ilist)):
+    correctpred = int([int(s) for s in ilist[i] if s.isdigit()][-1])
+    index_max = max(enumerate(guesslist[i]), key=lambda v: v[1])[0]
+    #print(correctpred, index_max);
+    if (correctpred == index_max):
+        num_correct += 1
+
+print("Accuracy: ", 100*num_correct/len(ilist) ,"%")

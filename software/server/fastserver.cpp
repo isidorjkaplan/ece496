@@ -110,7 +110,7 @@ double elapsedTime;
 
 
 #ifdef DEBUG
-#define PRINTF(...) (printf(__VA_ARGS__))
+#define PRINTF(...) ({printf("T=%u ms:", get_usec_time()/1000); printf(__VA_ARGS__)})
 #endif
 
 #ifndef DEBUG
@@ -167,6 +167,14 @@ void initFPGABus() {
     FIFO_WRITE_BLOCK(1ull << 31);
 	
     PRINTF("Flushed FIFO read queue with %d elements\n", read_count);
+}
+
+uint64_t get_usec_time() {
+    struct timeval tv;
+    gettimeofday(&tv,NULL);
+    
+    // multiply seconds by 1,000,000 to convert to usec
+    return  (uint64_t)1000000 * tv.tv_sec + tv.tv_usec;
 }
 
 #define VALUE_READ_BITS ((unsigned int)18)
@@ -348,6 +356,7 @@ void* transmitForever(void*);
 
 #define NUM_SIM_CLIENTS 8
 
+#define FIFO_SIZE 5000
 
 // SPSC FIFO
 // Not very efficient TBH, but it doesnt really need to be
@@ -355,17 +364,22 @@ class ResultDataQueue {
     std::queue<std::vector<char>> dataQueue;
     pthread_mutex_t mutex;
     sem_t itemsLeft;
+
+    sem_t spaceLeft;
 public:
     ResultDataQueue() {
         pthread_mutex_init(&mutex, NULL);
         sem_init(&itemsLeft, 0, 0);
+        sem_init(&spaceLeft, 0, FIFO_SIZE);
     }
     ~ResultDataQueue() {
         pthread_mutex_destroy(&mutex);
         sem_destroy(&itemsLeft);
+        sem_destroy(&spaceLeft);
     }
 
     void push(std::vector<char> && in) {
+        sem_wait(&spaceLeft);
         pthread_mutex_lock(&mutex);
         dataQueue.push(std::move(in));
         pthread_mutex_unlock(&mutex);
@@ -385,6 +399,7 @@ public:
         dataQueue.pop();
         
         pthread_mutex_unlock(&mutex);
+        sem_post(&spaceLeft);
         return std::move(ret);
     }
 
@@ -404,15 +419,19 @@ public:
 class ImageDataQueue {
     std::queue<std::vector<char>> dataQueue;
     pthread_mutex_t mutex;
+    sem_t spaceLeft;
 public:
     ImageDataQueue() {
         pthread_mutex_init(&mutex, NULL);
+        sem_init(&spaceLeft, 0, FIFO_SIZE);
     }
     ~ImageDataQueue() {
         pthread_mutex_destroy(&mutex);
+        sem_destroy(&spaceLeft);
     }
 
     void push(std::vector<char> && in) {
+        sem_wait(&spaceLeft);
         pthread_mutex_lock(&mutex);
         dataQueue.push(std::move(in));
         pthread_mutex_unlock(&mutex);
@@ -425,6 +444,7 @@ public:
         if (!dataQueue.empty()) {
             ret = std::move(dataQueue.front());
             dataQueue.pop();
+            sem_post(&spaceLeft); // technically would be better perf if this came outside the lock
         }
         pthread_mutex_unlock(&mutex);
         return std::move(ret);
