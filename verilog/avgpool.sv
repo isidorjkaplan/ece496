@@ -38,10 +38,11 @@ module sum #(
             for(int i = 0; i < CHANNELS; i++)
                 sum[i] <= '0;
         end
-        // accumulate only integer portion
+        // accumulated only integer portion for testing hence the commented line with shift
         else if(i_ready && i_valid) begin
             for(int i = 0; i < CHANNELS; i++)
-                sum[i] <= sum[i] + (i_data[i] >> (VALUE_Q_FORMAT_N));
+                // sum[i] <= sum[i] + (i_data[i] >> (VALUE_Q_FORMAT_N));
+                sum[i] <= sum[i] + i_data[i];
         end
     end
 

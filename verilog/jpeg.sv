@@ -1,3 +1,80 @@
+module jpeg_decoder_array #(
+    parameter NUM_DECODERS, // This is the size of the array for parallelism
+    parameter WIDTH,   // For MNIST
+    parameter HEIGHT,  // HACK: for some reason last 4 rows are just not working properly
+    parameter MAX_JPEG_WORDS
+)(
+    // General signals
+    input clk, 
+    input reset,
+    // next row logic
+    input   logic        [31 : 0]  in_data,
+    input   logic                  in_last, // MUST ARRIVE WITH DATA
+    input   logic                  in_valid,
+    output  logic                  in_ready,
+    // output row valid 
+    output  logic         [7 : 0] out_data[3], // RGBA 7-bit
+    output  logic                 out_valid,
+    output  logic                 out_last,
+    input   logic                 out_ready
+);   
+    // Round-robin input selector
+    logic [$clog2(NUM_DECODERS):0] input_sel;
+    // Round-robin output selector
+    logic [$clog2(NUM_DECODERS):0] output_sel;
+
+    // Options for output mux
+    logic                 arr_in_ready[NUM_DECODERS];
+    logic         [7 : 0] arr_out_data[NUM_DECODERS][3]; 
+    logic                 arr_out_valid[NUM_DECODERS];
+    logic                 arr_out_last[NUM_DECODERS];
+
+    // Generate each of the decoders
+    genvar i;
+    generate
+        for (i = 0; i < NUM_DECODERS; i++) begin : decoders 
+            // Select for intput mux 
+            
+            logic is_selected;
+            assign is_selected = (input_sel == i);
+
+            jpeg_decoder #(.WIDTH(WIDTH), .HEIGHT(HEIGHT), .MAX_JPEG_WORDS(MAX_JPEG_WORDS)) decoder(
+                .clk(clk), .reset(reset), 
+                .in_data(in_data), .in_last(in_last), .in_valid(in_valid && is_selected), .in_ready(arr_in_ready[i]),
+                .out_data(arr_out_data[i]), .out_valid(arr_out_valid[i]), .out_last(arr_out_last[i]), .out_ready(out_ready && is_selected)
+            );
+        end
+    endgenerate
+
+    // Select for output mux
+    always_comb begin
+        out_data = arr_out_data[output_sel];
+        out_valid = arr_out_valid[output_sel];
+        out_last = arr_out_last[output_sel];
+        in_ready = arr_in_ready[input_sel];
+    end
+
+    // Updating the select signals to wrap around
+    always_ff@(posedge clk) begin
+        if (reset) begin
+            input_sel <= 0;
+            output_sel <= 0;
+        end else begin
+            // If this input image is done wrap to next decoder
+            if (in_last && in_ready && in_valid) begin
+                input_sel <= (input_sel != (NUM_DECODERS-1))?(input_sel + 1):0;
+            end
+            // If this output is done wrap to next decoder
+            if (out_last && out_ready && out_valid ) begin
+                output_sel <= (output_sel != (NUM_DECODERS-1))?(output_sel + 1):0;
+            end
+
+        end
+    end
+
+endmodule 
+
+
 // Input is streamed as a jpeg file 
 // Output is streamed in row-major order 
 module jpeg_decoder #(

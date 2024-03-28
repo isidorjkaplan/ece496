@@ -80,7 +80,8 @@ module model #(
         .OUTPUT_CHANNELS(CNN1_OUT_CH),
         .INPUT_CHANNELS(CNN1_IN_CH),
         .STRIDE(1),
-        .RELU(1)
+        .RELU(1),
+        .OUT_CHANNELS_PER_CYCLE(2) // Only for first layer since this is currently limiting throughput of entire system
     ) conv1 (
         .clk(clk),
         .reset(reset),

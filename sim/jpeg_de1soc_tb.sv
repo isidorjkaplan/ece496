@@ -31,6 +31,16 @@ module tb();
     // Generate a 50MHz clock
     initial clk = 1'b1;
     always #(CLK_PERIOD/2) clk = ~clk;
+
+    integer cycle_num;
+    initial begin
+        cycle_num = 1;
+        while(1) begin
+            @(posedge clk);
+            cycle_num += 1;
+        end
+    end
+
     
     // Producer Process
     initial begin
@@ -44,7 +54,7 @@ module tb();
         @(posedge clk);
         reset = 0;
 
-        for (int img_num = 0; img_num < 5; img_num++) begin
+        for (int img_num = 0; img_num < 10; img_num++) begin
             test_image = $fopen(img_num%2==0?TEST_IMAGE0:TEST_IMAGE1, "rb");
             num_bytes= 0;
             while(!$feof(test_image)) begin
