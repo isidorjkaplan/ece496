@@ -4,6 +4,10 @@ import time
 import numpy as np
 
 
+CROPPED_DIM = 28
+CROPPED_SHOW_DIM = 350
+
+
 def main():
     print("before cam", flush=True)
     cam = cv2.VideoCapture(0)
@@ -19,16 +23,16 @@ def main():
         ret, frame = cam.read()  # get frame
         frame = cv2.flip(frame, 1)  # flip horizontally
 
-        cv2.rectangle(frame, pt1=(340, 60), pt2=(940,660), color=(0, 0, 255), thickness=3)
+        cv2.rectangle(frame, pt1=(340, 60), pt2=(940, 660), color=(0, 0, 255), thickness=3)
         cropped = frame[60:660, 340:940, :]
-        cropped = cv2.resize(cropped, (28, 28))
+        cropped = cv2.resize(cropped, (CROPPED_DIM, CROPPED_DIM))
 
         frame_show = cv2.resize(frame, (800, 450))
-        cropped_show = cv2.resize(cropped, (450, 450))
+        cropped_show = cv2.resize(cropped, (350, 350))
 
-        combined = np.zeros([450, 1250, 3], 'uint8')
+        combined = np.zeros([450 + CROPPED_SHOW_DIM, 800, 3], 'uint8')
         combined[0:450, 0:800, :] = frame_show
-        combined[0:450, 800:1250, :] = cropped_show
+        combined[450:(450 + CROPPED_SHOW_DIM), 0:CROPPED_SHOW_DIM, :] = cropped_show
 
         cv2.imshow("frame", combined)
 
