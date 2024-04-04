@@ -18,27 +18,28 @@ def main():
     while True:
         ret, frame = cam.read()  # get frame
         frame = cv2.flip(frame, 1)  # flip horizontally
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        cv2.rectangle(frame, pt1=(340, 60), pt2=(940,660), color=(0, 0, 255), thickness=3)
+        cropped = frame[60:660, 340:940, :]
+        cropped = cv2.resize(cropped, (28, 28))
 
         frame_show = cv2.resize(frame, (800, 450))
-        gray_show = cv2.resize(gray, (800, 450))
-        gray_show_3ch = np.zeros([450, 800, 3], 'uint8')
-        for i in range(3):
-            gray_show_3ch[:, :, i] = gray_show
-        combined = np.zeros([450, 1600, 3], 'uint8')
+        cropped_show = cv2.resize(cropped, (450, 450))
+
+        combined = np.zeros([450, 1250, 3], 'uint8')
         combined[0:450, 0:800, :] = frame_show
-        combined[0:450, 800:1600, :] = gray_show_3ch
+        combined[0:450, 800:1250, :] = cropped_show
 
         cv2.imshow("frame", combined)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
-        if (counter % 600) == 0:
-            img_encode = cv2.imencode('.jpg', combined)[1]
-            filename = "testimage_%d.jpg" % counter
-            with open(filename, "wb") as f:
-                f.write(img_encode)
+        # if (counter % 600) == 0:
+        #     img_encode = cv2.imencode('.jpg', combined)[1]
+        #     filename = "testimage_%d.jpg" % counter
+        #     with open(filename, "wb") as f:
+        #         f.write(img_encode)
 
         counter = counter + 1
         time.sleep(0.016)  # so we don't burn the camera
