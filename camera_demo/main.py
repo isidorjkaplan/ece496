@@ -2,10 +2,71 @@ import cv2
 from imutils.video import FPS
 import time
 import numpy as np
+import socket
+import struct
 
 
 CROPPED_DIM = 28
 CROPPED_SHOW_DIM = 350
+
+
+def test_read_file():
+    with open('file_0_5.jpg', 'rb') as file:
+        img = file.read()
+        imgSize = len(img)
+        print("img size is %d bytes" % imgSize)
+
+
+def test_send():
+    print("testing send and receive")
+    # IP address and port of the server you want to connect to
+    server_ip = "192.168.2.123"
+    server_port = 6202
+
+    # Create a TCP socket
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    try:
+        # Connect to the server
+        client_socket.connect((server_ip, server_port))
+        print("Connected to the server.")
+
+        img = None
+        imgSize = None
+
+        # Send data to the server
+        # Read image file as binary
+        with open('file_0_5.jpg', 'rb') as file:
+            img = file.read()
+
+        imgSize = len(img)
+        print("img size is %d bytes" % imgSize)
+        # packs into type BYTES so its now binary,
+        # I is unsigned int
+        # ! is big endian
+        imgSize = struct.pack("!I", imgSize)
+        print("img size is after conversion is ", imgSize)
+        print("img size is of length %d" % len(imgSize))
+
+        # send all sends everything, no need to check how many bytes sent
+        client_socket.sendall(imgSize)
+        client_socket.sendall(img)
+        print("Image sent")
+
+        # need to add better receiving logic but will do later
+        # Receive data from the server
+        resultSize = client_socket.recv(4)
+        print("Result Size without conversion: ", resultSize)
+        resultSize = struct.unpack('!I', resultSize)[0]
+        result = client_socket.recv(1024)
+        print("Received result: ", result)
+        print("Expected Length: %d; Received Length: %d" % (resultSize, len(result)))
+
+    except ConnectionRefusedError:
+        print("Connection was refused. Make sure the server is running and reachable.")
+    finally:
+        # Close the socket
+        client_socket.close()
 
 
 def main():
@@ -54,6 +115,8 @@ def main():
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    main()
+    # test_read_file()
+    test_send()
+    # main()
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
